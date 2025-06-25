@@ -567,7 +567,7 @@ export default function MovementsPage() {
                             <span className="font-medium">{movement.quantity}</span>
                           </td>
                           <td className="p-4">
-                            {movement.total_value && <span>${movement.total_value.toFixed(2)}</span>}
+                            {movement.total_value && <span>${Number(movement.total_value).toFixed(2)}</span>}
                           </td>
                           <td className="p-4">
                             {movement.location && (
@@ -643,7 +643,7 @@ export default function MovementsPage() {
                     {movement.total_value && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Value:</span>
-                        <span className="font-medium">${movement.total_value.toFixed(2)}</span>
+                        <span className="font-medium">${Number(movement.total_value).toFixed(2)}</span>
                       </div>
                     )}
 

@@ -35,7 +35,7 @@ export function MovementStats({ movements }: MovementStatsProps) {
       stockOutCount: stockOut.length,
       stockInQuantity: stockIn.reduce((sum, m) => sum + m.quantity, 0),
       stockOutQuantity: stockOut.reduce((sum, m) => sum + m.quantity, 0),
-      totalValue: movementList.reduce((sum, m) => sum + (m.total_value || 0), 0),
+      totalValue: Number(movementList.reduce((sum, m) => sum + (m.total_value || 0), 0)) || 0,
     }
   }
 
@@ -74,8 +74,8 @@ export function MovementStats({ movements }: MovementStatsProps) {
     },
     {
       title: "Total Value",
-      value: `$${thisMonthStats.totalValue.toFixed(2)}`,
-      change: calculatePercentageChange(thisMonthStats.totalValue, lastMonthStats.totalValue),
+      value: `$${(thisMonthStats.totalValue || 0).toFixed(2)}`,
+      change: calculatePercentageChange(thisMonthStats.totalValue || 0, lastMonthStats.totalValue || 0),
       icon: DollarSign,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
