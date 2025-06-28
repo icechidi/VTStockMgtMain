@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
+import { Package, AlertTriangle, TrendingUp, TrendingDown, BadgeAlert } from "lucide-react"
 
 interface StockStats {
   totalItems: number
+  repairItems?: number
   lowStockItems: number
   totalValue: number
   recentMovements: number
@@ -14,6 +15,7 @@ interface StockStats {
 export function DashboardStats() {
   const [stats, setStats] = useState<StockStats>({
     totalItems: 0,
+    repairItems: 0,
     lowStockItems: 0,
     totalValue: 0,
     recentMovements: 0,
@@ -36,6 +38,7 @@ export function DashboardStats() {
       // Fallback to sample data
       setStats({
         totalItems: 1250,
+        repairItems: 0,
         lowStockItems: 45,
         totalValue: 125000,
         recentMovements: 23,
@@ -50,6 +53,13 @@ export function DashboardStats() {
       title: "Total Items",
       value: stats.totalItems,
       icon: Package,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Repair Items",
+      value: stats.repairItems,
+      icon: BadgeAlert,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
     },
