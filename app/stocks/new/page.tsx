@@ -36,7 +36,17 @@ const categories = [
   "Cables",
   "Office Supplies",
 ]
-const locations = ["Main Warehouse", "Store A", "Store B", "Distribution Center", "Office Storage"]
+const locations = [
+    "B-Block-SR0",
+    "B-Block-SR1", 
+    "B-Block-SR2", 
+    "B-Block-SR3", 
+    "B-Block-SR4", 
+    "A-Block-SR0", 
+    "A-Block-SR1",
+    "A-Block-SR2", 
+    "Office Storage"
+]
 
 export default function NewStockItemPage() {
   const router = useRouter()
