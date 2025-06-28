@@ -301,7 +301,7 @@ export default function StocksPage() {
                     <SelectContent>
                       <SelectItem value="ALL">All Categories</SelectItem>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
+                        <SelectItem key={category} value={category!}>
                           {category}
                         </SelectItem>
                       ))}
@@ -321,8 +321,8 @@ export default function StocksPage() {
                     <SelectContent>
                       <SelectItem value="ALL">All Locations</SelectItem>
                       {locations.map((location) => (
-                        <SelectItem key={location} value={location}>
-                          {location}
+                        <SelectItem key={location ?? ""} value={location ?? ""}>
+                          {location ?? "Unknown"}
                         </SelectItem>
                       ))}
                     </SelectContent>
