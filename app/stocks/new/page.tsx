@@ -31,8 +31,8 @@ const categoriesWithSub: Record<string, string[]> = {
   Software: ["Operating System", "Productivity", "Security"],
   Accessories: ["Mouse", "Keyboard", "Webcam"],
   Networking: ["Routers", "Switches", "Cables"],
-  Storage: ["SSD", "HDD", "USB Drive"],
-  Printers: ["Laser", "Inkjet", "Supplies"],
+  Storage: ["SSD", "HDD", "USB Drive", "SD Card", "External Drive", "NAS", "Cloud Storage"],
+  Printers: ["Laser", "Inkjet", "Supplies", "Toner", "Ink Cartridges", "Xerox"],
   Cables: ["HDMI", "Ethernet", "Power"],
   "Office Supplies": ["Paper", "Pens", "Folders"],
 }
