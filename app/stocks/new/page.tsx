@@ -26,16 +26,22 @@ interface StockItemData {
   location?: string
 }
 
-const categories = [
-  "Hardware",
-  "Software",
-  "Accessories",
-  "Networking",
-  "Storage",
-  "Printers",
-  "Cables",
-  "Office Supplies",
-]
+const categoriesWithSub: Record<string, string[]> = {
+  Hardware: ["Monitors", "System Unit", "Motherboard", "RAM", "CPU"],
+  Software: ["Operating System", "Productivity", "Security"],
+  Accessories: ["Mouse", "Keyboard", "Webcam"],
+  Networking: ["Routers", "Switches", "Cables"],
+  Storage: ["SSD", "HDD", "USB Drive"],
+  Printers: ["Laser", "Inkjet", "Supplies"],
+  Cables: ["HDMI", "Ethernet", "Power"],
+  "Office Supplies": ["Paper", "Pens", "Folders"],
+}
+
+const categories = Object.keys(categoriesWithSub)
+
+// Remove useState hooks from here. The category/subcategory logic should be inside the component.
+
+
 const locations = [
     "B-Block-SR0",
     "B-Block-SR1", 
@@ -52,6 +58,10 @@ export default function NewStockItemPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Move category/subcategory state here
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [selectedSubCategory, setSelectedSubCategory] = useState("")
 
   const [formData, setFormData] = useState<StockItemData>({
     name: "",
@@ -83,14 +93,16 @@ export default function NewStockItemPage() {
         })
         router.push("/stocks")
       } else {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to create item")
+        toast({
+          title: "Error",
+          description: "Failed to create stock item",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      console.error("Error creating item:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create stock item",
+        description: "An unexpected error occurred",
         variant: "destructive",
       })
     } finally {
@@ -141,7 +153,14 @@ export default function NewStockItemPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={(value) => {
+                      setSelectedCategory(value)
+                      setSelectedSubCategory("")
+                      handleInputChange("category", value)
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
@@ -153,36 +172,43 @@ export default function NewStockItemPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedCategory && (
+                    <Select
+                      value={selectedSubCategory}
+                      onValueChange={(value) => {
+                        setSelectedSubCategory(value)
+                        // Optionally, you can store subcategory in formData if needed
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select subcategory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoriesWithSub[selectedCategory].map((sub) => (
+                          <SelectItem key={sub} value={sub}>
+                            {sub}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
-                  placeholder="Enter item description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="unit_price">Unit Price ($) *</Label>
+                  <Label htmlFor="unit_price">Unit Price *</Label>
                   <Input
                     id="unit_price"
                     type="number"
                     min="0"
-                    step="0.01"
                     value={formData.unit_price}
                     onChange={(e) => handleInputChange("unit_price", Number(e.target.value))}
-                    placeholder="0.00"
+                    placeholder="0"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="quantity">Initial Quantity *</Label>
+                  <Label htmlFor="quantity">Quantity *</Label>
                   <Input
                     id="quantity"
                     type="number"
