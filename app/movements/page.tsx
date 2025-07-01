@@ -542,8 +542,7 @@ export default function MovementsPage() {
                     </thead>
                     <tbody>
                       {currentMovements.map((movement) => (
-                        <tr key={movement.id} className="border-b hover:bg-gray-50">
-                          <td className="p-4">
+                            <tr key={movement.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">                          <td className="p-4">
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-muted-foreground" />
                               <span className="text-sm">{formatDateTime(movement.movement_date)}</span>
