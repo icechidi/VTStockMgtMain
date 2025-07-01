@@ -19,18 +19,14 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en">
       <body className={inter.className}>
-
-
+{/* Wrapped the ThemeProvider  to the main sidebar to allows us to use the theme toggle and manage themes */}
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <SidebarProvider>
           <AppSidebar activeTab="dashboard" onTabChange={() => {}} />
           <main className="flex-1 overflow-auto">{children}</main>
         </SidebarProvider>
-
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-        </ThemeProvider>
-
         <Toaster />
+      </ThemeProvider>
       </body>
     </html>
   )
