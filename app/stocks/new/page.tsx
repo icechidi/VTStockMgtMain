@@ -41,7 +41,6 @@ const categories = Object.keys(categoriesWithSub)
 
 // Remove useState hooks from here. The category/subcategory logic should be inside the component.
 
-
 const locations = [
     "B-Block-SR0",
     "B-Block-SR1", 
