@@ -13,6 +13,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 const items = [
   {
@@ -32,8 +33,9 @@ const items = [
   },
   {
     title: "Locations",
-    url: "/locations",
+    url: "/location",
     icon: Warehouse,
+    key: "location",
   },
   {
     title: "Reports",
@@ -55,14 +57,21 @@ const adminItems = [
   },
 ]
 
-export function AppSidebar() {
+interface SidebarProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export function AppSidebar({ activeTab, onTabChange }: SidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <Box className="h-8 w-8 text-primary" />
-          <span className="text-lg font-semibold">StockManager</span>
+          <span className="text-lg font-semibold">VT-Stock MGT</span>
+          <ThemeToggle />
         </div>
+        
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -101,7 +110,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <div className="text-xs text-muted-foreground">Stock Management v2.0</div>
+        <div className="text-xs text-muted-foreground">VT-Stock MGT v2.0</div>
       </SidebarFooter>
     </Sidebar>
   )
