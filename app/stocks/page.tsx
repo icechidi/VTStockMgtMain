@@ -522,7 +522,7 @@ export default function StocksPage() {
                       {currentItems.map((item) => {
                         const status = getStockStatus(item.quantity, item.min_quantity)
                         return (
-                          <tr key={item.id} className="border-b hover:bg-gray-50">
+                          <tr key={item.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                             <td className="p-4">
                               <div>
                                 <div className="font-medium">{item.name}</div>
