@@ -31,6 +31,24 @@ CREATE TABLE locations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(200) NOT NULL,
+    email VARCHAR(200) NOT NULL UNIQUE,
+    role VARCHAR(50) DEFAULT 'employee',
+    status VARCHAR(20) DEFAULT 'active',
+    location_id UUID REFERENCES locations(id),
+    phone VARCHAR(20),
+    department VARCHAR(100),
+    join_date DATE DEFAULT CURRENT_DATE,
+    last_login TIMESTAMP,
+    avatar_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Suppliers table
 CREATE TABLE suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
