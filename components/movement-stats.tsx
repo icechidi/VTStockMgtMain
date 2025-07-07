@@ -108,9 +108,5 @@ export function MovementStats({ movements }: MovementStatsProps) {
     </div>
   )
 }
-const handleAddMovement = (newMovement: StockMovement) => {
-  setMovements(prev => [...prev, newMovement])
-}
-
 
 
