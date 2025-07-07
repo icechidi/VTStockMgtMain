@@ -1,5 +1,6 @@
 "use client"
 
+import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Package, DollarSign } from "lucide-react"
 
@@ -29,6 +30,38 @@ export function MovementStats({ movements }: MovementStatsProps) {
     const stockIn = movementList.filter((m) => m.movement_type === "IN")
     const stockOut = movementList.filter((m) => m.movement_type === "OUT")
 
+  // Example initial data, replace with your actual data source or fetch logic
+  const [movements, setMovements] = useState<StockMovement[]>([
+    {
+      id: 1,
+      movement_type: "IN",
+      quantity: 100,
+      total_value: 5000,
+      movement_date: "2025-07-01",
+    },
+    {
+      id: 2,
+      movement_type: "OUT",
+      quantity: 20,
+      total_value: 1000,
+      movement_date: "2025-07-05",
+    },
+    // ...more data
+  ])
+
+  // Example handlers for adding/editing/deleting movements
+  const handleAddMovement = (newMovement: StockMovement) => {
+    setMovements(prev => [...prev, newMovement])
+  }
+
+  const handleEditMovement = (id: number, updated: StockMovement) => {
+    setMovements(prev => prev.map(m => m.id === id ? updated : m))
+  }
+
+  const handleDeleteMovement = (id: number) => {
+    setMovements(prev => prev.filter(m => m.id !== id))
+  }
+
     return {
       totalMovements: movementList.length,
       stockInCount: stockIn.length,
@@ -47,7 +80,6 @@ export function MovementStats({ movements }: MovementStatsProps) {
     return ((current - previous) / previous) * 100
   }
 
-  
   const stats = [
     {
       title: "Total Movements",
@@ -108,5 +140,3 @@ export function MovementStats({ movements }: MovementStatsProps) {
     </div>
   )
 }
-
-
