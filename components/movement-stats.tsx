@@ -112,7 +112,5 @@ const handleAddMovement = (newMovement: StockMovement) => {
   setMovements(prev => [...prev, newMovement])
 }
 
-const handleEditMovement = (id: number, updated: StockMovement) => {
-  setMovements(prev => prev.map(m => m.id === id ? updated : m))
-}
+
 
