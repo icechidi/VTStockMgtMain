@@ -47,6 +47,7 @@ export function MovementStats({ movements }: MovementStatsProps) {
     return ((current - previous) / previous) * 100
   }
 
+  
   const stats = [
     {
       title: "Total Movements",
