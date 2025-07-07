@@ -108,3 +108,14 @@ export function MovementStats({ movements }: MovementStatsProps) {
     </div>
   )
 }
+const handleAddMovement = (newMovement: StockMovement) => {
+  setMovements(prev => [...prev, newMovement])
+}
+
+const handleEditMovement = (id: number, updated: StockMovement) => {
+  setMovements(prev => prev.map(m => m.id === id ? updated : m))
+}
+
+const handleDeleteMovement = (id: number) => {
+  setMovements(prev => prev.filter(m => m.id !== id))
+}
