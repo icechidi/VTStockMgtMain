@@ -236,7 +236,7 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Quantity */}
+            {/* Quantity of Items */}
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity *</Label>
               <Input
