@@ -198,7 +198,7 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
             </Card>
           )}
 
-          {/* Movement Type */}
+          {/* Movement Type based on items selected */}
           <div className="space-y-3">
             <Label>Movement Type *</Label>
             <RadioGroup
