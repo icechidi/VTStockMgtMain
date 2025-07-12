@@ -252,7 +252,7 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
               )}
             </div>
 
-            {/* Unit Price */}
+            {/* Unit Price per items*/}
             <div className="space-y-2">
               <Label htmlFor="unit_price">Unit Price ($)</Label>
               <Input
