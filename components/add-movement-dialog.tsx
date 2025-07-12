@@ -252,7 +252,7 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
               )}
             </div>
 
-            {/* Unit Price per items*/}
+            {/* Unit Price per items */}
             <div className="space-y-2">
               <Label htmlFor="unit_price">Unit Price ($)</Label>
               <Input
@@ -267,7 +267,7 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
             </div>
           </div>
 
-          {/* Total Value */}
+          {/* Total Value of items*/}
           {formData.total_value && (
             <div className="space-y-2">
               <Label>Total Value</Label>
