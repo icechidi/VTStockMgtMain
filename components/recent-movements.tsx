@@ -81,9 +81,20 @@ export function RecentMovements() {
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
+          // Display recent movements and ensure consistent height & overflow handling
+          <div className="space-y-3 overflow-y-auto"
+              style={{
+              maxHeight: "295px", // 4 items * 68px (adjust if your item height changes)
+              minHeight: "68px",
+              paddingRight: "4px",
+            }}
+            >
             {movements.map((movement) => (
-              <div key={movement.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50  dark:hover:bg-gray-800">
+              <div 
+                key={movement.id} 
+                className="flex items-center justify-between p-3 border rounded hover:bg-gray-50  dark:hover:bg-gray-800"
+                style={{ minHeight: "68px" }} // Ensure consistent height per item
+              >
                 <div>
                   <div className="font-medium">{movement.item_name}</div>
                   <div className="text-sm text-muted-foreground">{formatDate(movement.movement_date)}</div>
