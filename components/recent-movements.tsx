@@ -83,7 +83,7 @@ export function RecentMovements() {
         ) : (
           <div className="space-y-3">
             {movements.map((movement) => (
-              <div key={movement.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+              <div key={movement.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50  dark:hover:bg-gray-800">
                 <div>
                   <div className="font-medium">{movement.item_name}</div>
                   <div className="text-sm text-muted-foreground">{formatDate(movement.movement_date)}</div>
