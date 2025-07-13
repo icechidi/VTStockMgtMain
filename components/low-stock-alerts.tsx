@@ -83,7 +83,7 @@ export function LowStockAlerts() {
             {lowStockItems.map((item) => {
               const status = getStockStatus(item.quantity, item.min_quantity)
               return (
-                <div key={item.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+                <div key={item.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50  dark:hover:bg-gray-800">
                   <div>
                     <div className="font-medium">{item.name}</div>
                     <div className="text-sm text-muted-foreground">
