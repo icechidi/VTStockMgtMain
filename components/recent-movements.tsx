@@ -58,6 +58,7 @@ export function RecentMovements() {
   }
 
   return (
+    // Recent movements card
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Recent Movements</CardTitle>
