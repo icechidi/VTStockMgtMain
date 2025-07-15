@@ -39,7 +39,7 @@ export default function StocksPage() {
   const [filteredItems, setFilteredItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [viewMode, setViewMode] = useState<"table" | "cards">("cards")
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(12)
   const { toast } = useToast()
