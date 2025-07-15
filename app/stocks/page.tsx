@@ -34,6 +34,7 @@ interface ItemFilters {
   sortOrder: "asc" | "desc"
 }
 
+// Main component for the Stocks page, table view set as defaults
 export default function StocksPage() {
   const [items, setItems] = useState<StockItem[]>([])
   const [filteredItems, setFilteredItems] = useState<StockItem[]>([])
@@ -266,120 +267,108 @@ export default function StocksPage() {
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-4">
-          {/* Filters */}
+          {/* Compact Filters & Search */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filters & Search
-              </CardTitle>
-            </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search items..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                      className="pl-8"
-                    />
-                  </div>
+              <div className="flex flex-wrap gap-3 items-center">
+                {/* Search */}
+                <div className="relative w-full sm:w-48">
+                  <Input
+                    placeholder="Search items..."
+                    value={filters.search}
+                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                    className="pl-8 pr-3 h-9 text-sm"
+                  />
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select
-                    value={filters.category}
-                    onValueChange={(value) => setFilters({ ...filters, category: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Categories</SelectItem>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category!}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Category */}
+                <Select
+                  value={filters.category}
+                  onValueChange={(value) => setFilters({ ...filters, category: value })}
+                >
+                  <SelectTrigger className="w-32 h-9 text-sm">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category!}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Location</label>
-                  <Select
-                    value={filters.location}
-                    onValueChange={(value) => setFilters({ ...filters, location: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Locations</SelectItem>
-                      {locations.map((location) => (
-                        <SelectItem key={location ?? ""} value={location ?? ""}>
-                          {location ?? "Unknown"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Location */}
+                <Select
+                  value={filters.location}
+                  onValueChange={(value) => setFilters({ ...filters, location: value })}
+                >
+                  <SelectTrigger className="w-32 h-9 text-sm">
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Locations</SelectItem>
+                    {locations.map((location) => (
+                      <SelectItem key={location ?? ""} value={location ?? ""}>
+                        {location ?? "Unknown"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Stock Status</label>
-                  <Select
-                    value={filters.stockStatus}
-                    onValueChange={(value) => setFilters({ ...filters, stockStatus: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Status</SelectItem>
-                      <SelectItem value="in-stock">In Stock</SelectItem>
-                      <SelectItem value="low-stock">Low Stock</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                      <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Stock Status */}
+                <Select
+                  value={filters.stockStatus}
+                  onValueChange={(value) => setFilters({ ...filters, stockStatus: value })}
+                >
+                  <SelectTrigger className="w-32 h-9 text-sm">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Status</SelectItem>
+                    <SelectItem value="in-stock">In Stock</SelectItem>
+                    <SelectItem value="low-stock">Low Stock</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Sort By</label>
-                  <Select
-                    value={`${filters.sortBy}-${filters.sortOrder}`}
-                    onValueChange={(value) => {
-                      const [sortBy, sortOrder] = value.split("-")
-                      setFilters({ ...filters, sortBy, sortOrder: sortOrder as "asc" | "desc" })
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                      <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                      <SelectItem value="quantity-desc">Quantity (High-Low)</SelectItem>
-                      <SelectItem value="quantity-asc">Quantity (Low-High)</SelectItem>
-                      <SelectItem value="unit_price-desc">Price (High-Low)</SelectItem>
-                      <SelectItem value="unit_price-asc">Price (Low-High)</SelectItem>
-                      <SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
-                      <SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                {/* Sort By */}
+                <Select
+                  value={`${filters.sortBy}-${filters.sortOrder}`}
+                  onValueChange={(value) => {
+                    const [sortBy, sortOrder] = value.split("-")
+                    setFilters({ ...filters, sortBy, sortOrder: sortOrder as "asc" | "desc" })
+                  }}
+                >
+                  <SelectTrigger className="w-36 h-9 text-sm">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                    <SelectItem value="quantity-desc">Quantity (High-Low)</SelectItem>
+                    <SelectItem value="quantity-asc">Quantity (Low-High)</SelectItem>
+                    <SelectItem value="unit_price-desc">Price (High-Low)</SelectItem>
+                    <SelectItem value="unit_price-asc">Price (Low-High)</SelectItem>
+                    <SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
+                    <SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <div className="flex items-center gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Reset Filters
+                {/* Reset Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={resetFilters}
+                >
+                  Reset
                 </Button>
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredItems.length} of {items.length} items
+                <div className="text-xs text-muted-foreground ml-auto">
+                  Showing {filteredItems.length} of {items.length}
                 </div>
               </div>
             </CardContent>
