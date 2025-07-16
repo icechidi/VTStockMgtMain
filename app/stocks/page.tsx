@@ -266,124 +266,145 @@ Add Item
 </TabsList>
 
 <TabsContent value="inventory" className="space-y-4">
-{/* Filters */}
-<Card>
-<CardHeader>
-<CardTitle className="flex items-center gap-2">
-<Filter className="h-5 w-5" />
-Filters & Search
-</CardTitle>
-</CardHeader>
-<CardContent>
-<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-<div className="space-y-2">
-<label className="text-sm font-medium">Search</label>
-<div className="relative">
-<Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-<Input
-placeholder="Search items..."
-value={filters.search}
-onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-className="pl-8"
-/>
-</div>
-</div>
-
-<div className="space-y-2">
-<label className="text-sm font-medium">Category</label>
-<Select
-value={filters.category}
-onValueChange={(value) => setFilters({ ...filters, category: value })}
->
-<SelectTrigger>
-<SelectValue />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="ALL">All Categories</SelectItem>
-{categories.map((category) => (
-<SelectItem key={category} value={category!}>
-{category}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-
-<div className="space-y-2">
-<label className="text-sm font-medium">Location</label>
-<Select
-value={filters.location}
-onValueChange={(value) => setFilters({ ...filters, location: value })}
->
-<SelectTrigger>
-<SelectValue />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="ALL">All Locations</SelectItem>
-{locations.map((location) => (
-<SelectItem key={location ?? ""} value={location ?? ""}>
-{location ?? "Unknown"}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-
-<div className="space-y-2">
-<label className="text-sm font-medium">Stock Status</label>
-<Select
-value={filters.stockStatus}
-onValueChange={(value) => setFilters({ ...filters, stockStatus: value })}
->
-<SelectTrigger>
-<SelectValue />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="ALL">All Status</SelectItem>
-<SelectItem value="in-stock">In Stock</SelectItem>
-<SelectItem value="low-stock">Low Stock</SelectItem>
-<SelectItem value="critical">Critical</SelectItem>
-<SelectItem value="out-of-stock">Out of Stock</SelectItem>
-</SelectContent>
-</Select>
-</div>
-
-<div className="space-y-2">
-<label className="text-sm font-medium">Sort By</label>
-<Select
-value={`${filters.sortBy}-${filters.sortOrder}`}
-onValueChange={(value) => {
-const [sortBy, sortOrder] = value.split("-")
-setFilters({ ...filters, sortBy, sortOrder: sortOrder as "asc" | "desc" })
-}}
->
-<SelectTrigger>
-<SelectValue />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="name-asc">Name (A-Z)</SelectItem>
-<SelectItem value="name-desc">Name (Z-A)</SelectItem>
-<SelectItem value="quantity-desc">Quantity (High-Low)</SelectItem>
-<SelectItem value="quantity-asc">Quantity (Low-High)</SelectItem>
-<SelectItem value="unit_price-desc">Price (High-Low)</SelectItem>
-<SelectItem value="unit_price-asc">Price (Low-High)</SelectItem>
-<SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
-<SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
-</SelectContent>
-</Select>
-</div>
-</div>
-
-<div className="flex items-center gap-2 mt-4">
-<Button variant="outline" size="sm" onClick={resetFilters}>
-Reset Filters
-</Button>
-<div className="text-sm text-muted-foreground">
-Showing {filteredItems.length} of {items.length} items
-</div>
-</div>
-</CardContent>
-</Card>
+  {/* Redesigned Filters - compact, single row/column, smaller */}
+  <Card>
+    <CardHeader className="pb-1">
+      <CardTitle className="flex items-center gap-2 text-base font-semibold">
+        <Filter className="h-4 w-4" />
+        <span className="text-sm">Filters & Search</span>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="flex flex-col md:flex-row md:items-end md:gap-3 gap-2">
+        {/* Search */}
+        <div className="flex-1 min-w-[140px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Search</label>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search items..."
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              className="pl-8 pr-2 py-1.5 text-sm rounded-md border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8"
+            />
+          </div>
+        </div>
+        {/* Category */}
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Category</label>
+          <Select
+            value={filters.category}
+            onValueChange={(value) => setFilters({ ...filters, category: value })}
+          >
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category} value={category!} className="text-sm">
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Location */}
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Location</label>
+          <Select
+            value={filters.location}
+            onValueChange={(value) => setFilters({ ...filters, location: value })}
+          >
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
+              <SelectValue placeholder="All Locations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Locations</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location ?? ""} value={location ?? ""} className="text-sm">
+                  {location ?? "Unknown"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Stock Status */}
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Stock Status</label>
+          <Select
+            value={filters.stockStatus}
+            onValueChange={(value) => setFilters({ ...filters, stockStatus: value })}
+          >
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="in-stock">In Stock</SelectItem>
+              <SelectItem value="low-stock">Low Stock</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Sort By */}
+        <div className="min-w-[130px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Sort By</label>
+          <Select
+            value={`${filters.sortBy}-${filters.sortOrder}`}
+            onValueChange={(value) => {
+              const [sortBy, sortOrder] = value.split("-")
+              setFilters({ ...filters, sortBy, sortOrder: sortOrder as "asc" | "desc" })
+            }}
+          >
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+              <SelectItem value="quantity-desc">Quantity (High-Low)</SelectItem>
+              <SelectItem value="quantity-asc">Quantity (Low-High)</SelectItem>
+              <SelectItem value="unit_price-desc">Price (High-Low)</SelectItem>
+              <SelectItem value="unit_price-asc">Price (Low-High)</SelectItem>
+              <SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
+              <SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Reset Button */}
+        <div className="flex items-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+            className="rounded-md border-gray-300 h-8 px-3 text-xs"
+          >
+            Reset
+          </Button>
+        </div>
+      </div>
+      {/* Filter summary */}
+      <div className="flex flex-wrap gap-1 mt-2 text-[11px] text-muted-foreground">
+        {filters.search && (
+          <span className="bg-muted px-2 py-0.5 rounded">Search: <b>{filters.search}</b></span>
+        )}
+        {filters.category !== "ALL" && (
+          <span className="bg-muted px-2 py-0.5 rounded">Category: <b>{filters.category}</b></span>
+        )}
+        {filters.location !== "ALL" && (
+          <span className="bg-muted px-2 py-0.5 rounded">Location: <b>{filters.location}</b></span>
+        )}
+        {filters.stockStatus !== "ALL" && (
+          <span className="bg-muted px-2 py-0.5 rounded">Status: <b>{filters.stockStatus.replace(/-/g, " ")}</b></span>
+        )}
+      </div>
+      <div className="text-[11px] text-muted-foreground mt-1">
+        Showing {filteredItems.length} of {items.length} items
+      </div>
+    </CardContent>
+  </Card>
 
 {/* View Toggle - positioned after filters like in movements page */}
 <div className="flex items-center justify-between">
