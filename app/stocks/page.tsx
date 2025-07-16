@@ -266,43 +266,43 @@ Add Item
 </TabsList>
 
 <TabsContent value="inventory" className="space-y-4">
-  {/* Redesigned Filters */}
+  {/* Redesigned Filters - compact, single row/column, smaller */}
   <Card>
-    <CardHeader className="pb-2">
-      <CardTitle className="flex items-center gap-2">
-        <Filter className="h-5 w-5" />
-        Filters & Search
+    <CardHeader className="pb-1">
+      <CardTitle className="flex items-center gap-2 text-base font-semibold">
+        <Filter className="h-4 w-4" />
+        <span className="text-sm">Filters & Search</span>
       </CardTitle>
     </CardHeader>
     <CardContent>
-      <div className="flex flex-col md:flex-row md:items-end md:gap-8 gap-3">
+      <div className="flex flex-col md:flex-row md:items-end md:gap-3 gap-2">
         {/* Search */}
-        <div className="flex-1 min-w-[200px]">
-          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Search</label>
+        <div className="flex-1 min-w-[140px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Search</label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search items..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+              className="pl-8 pr-2 py-1.5 text-sm rounded-md border border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8"
             />
           </div>
         </div>
         {/* Category */}
-        <div className="min-w-[160px]">
-          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Category</label>
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Category</label>
           <Select
             value={filters.category}
             onValueChange={(value) => setFilters({ ...filters, category: value })}
           >
-            <SelectTrigger className="rounded-lg border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Categories</SelectItem>
               {categories.map((category) => (
-                <SelectItem key={category} value={category!}>
+                <SelectItem key={category} value={category!} className="text-sm">
                   {category}
                 </SelectItem>
               ))}
@@ -310,19 +310,19 @@ Add Item
           </Select>
         </div>
         {/* Location */}
-        <div className="min-w-[160px]">
-          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Location</label>
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Location</label>
           <Select
             value={filters.location}
             onValueChange={(value) => setFilters({ ...filters, location: value })}
           >
-            <SelectTrigger className="rounded-lg border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
               <SelectValue placeholder="All Locations" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Locations</SelectItem>
               {locations.map((location) => (
-                <SelectItem key={location ?? ""} value={location ?? ""}>
+                <SelectItem key={location ?? ""} value={location ?? ""} className="text-sm">
                   {location ?? "Unknown"}
                 </SelectItem>
               ))}
@@ -330,13 +330,13 @@ Add Item
           </Select>
         </div>
         {/* Stock Status */}
-        <div className="min-w-[160px]">
-          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Stock Status</label>
+        <div className="min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Stock Status</label>
           <Select
             value={filters.stockStatus}
             onValueChange={(value) => setFilters({ ...filters, stockStatus: value })}
           >
-            <SelectTrigger className="rounded-lg border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -349,8 +349,8 @@ Add Item
           </Select>
         </div>
         {/* Sort By */}
-        <div className="min-w-[180px]">
-          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Sort By</label>
+        <div className="min-w-[130px]">
+          <label className="text-[11px] font-semibold text-muted-foreground mb-1 block">Sort By</label>
           <Select
             value={`${filters.sortBy}-${filters.sortOrder}`}
             onValueChange={(value) => {
@@ -358,7 +358,7 @@ Add Item
               setFilters({ ...filters, sortBy, sortOrder: sortOrder as "asc" | "desc" })
             }}
           >
-            <SelectTrigger className="rounded-lg border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+            <SelectTrigger className="rounded-md border-gray-300 focus:border-primary focus:ring-1 focus:ring-primary/20 transition h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -379,28 +379,28 @@ Add Item
             variant="outline"
             size="sm"
             onClick={resetFilters}
-            className="rounded-lg border-gray-300"
+            className="rounded-md border-gray-300 h-8 px-3 text-xs"
           >
             Reset
           </Button>
         </div>
       </div>
       {/* Filter summary */}
-      <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap gap-1 mt-2 text-[11px] text-muted-foreground">
         {filters.search && (
-          <span className="bg-muted px-2 py-1 rounded">Search: <b>{filters.search}</b></span>
+          <span className="bg-muted px-2 py-0.5 rounded">Search: <b>{filters.search}</b></span>
         )}
         {filters.category !== "ALL" && (
-          <span className="bg-muted px-2 py-1 rounded">Category: <b>{filters.category}</b></span>
+          <span className="bg-muted px-2 py-0.5 rounded">Category: <b>{filters.category}</b></span>
         )}
         {filters.location !== "ALL" && (
-          <span className="bg-muted px-2 py-1 rounded">Location: <b>{filters.location}</b></span>
+          <span className="bg-muted px-2 py-0.5 rounded">Location: <b>{filters.location}</b></span>
         )}
         {filters.stockStatus !== "ALL" && (
-          <span className="bg-muted px-2 py-1 rounded">Status: <b>{filters.stockStatus.replace(/-/g, " ")}</b></span>
+          <span className="bg-muted px-2 py-0.5 rounded">Status: <b>{filters.stockStatus.replace(/-/g, " ")}</b></span>
         )}
       </div>
-      <div className="text-xs text-muted-foreground mt-2">
+      <div className="text-[11px] text-muted-foreground mt-1">
         Showing {filteredItems.length} of {items.length} items
       </div>
     </CardContent>
