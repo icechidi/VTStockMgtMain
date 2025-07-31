@@ -1,3 +1,16 @@
+-- Create the database schema for inventory management system
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Categories table
+CREATE TABLE categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Subcategories table
 CREATE TABLE subcategories (
@@ -9,7 +22,6 @@ CREATE TABLE subcategories (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(name, category_id)
 );
-
 
 -- Locations table
 CREATE TABLE locations (
@@ -49,34 +61,41 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Suppliers table
-CREATE TABLE suppliers (
+-- Stock items table
+CREATE TABLE stock_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(200) NOT NULL,
-    contact_person VARCHAR(100),
-    email VARCHAR(100),
-    phone VARCHAR(20),
-    address TEXT,
-    city VARCHAR(100),
-    country VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
--- Customers table
-CREATE TABLE customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(200) NOT NULL,
-    contact_person VARCHAR(100),
-    email VARCHAR(100),
-    phone VARCHAR(20),
-    address TEXT,
-    city VARCHAR(100),
-    country VARCHAR(100),
+    description TEXT,
+    barcode VARCHAR(100) UNIQUE,
+    quantity INTEGER DEFAULT 0,
+    unit_price DECIMAL(10,2) DEFAULT 0,
+    min_quantity INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'in_stock',
+    category_id UUID REFERENCES categories(id),
+    subcategory_id UUID REFERENCES subcategories(id),
+    location_id UUID REFERENCES locations(id),
+    created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
+-- Stock movements table
+CREATE TABLE stock_movements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id UUID NOT NULL REFERENCES stock_items(id) ON DELETE CASCADE,
+    movement_type VARCHAR(10) NOT NULL CHECK (movement_type IN ('IN', 'OUT')),
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(10,2),
+    total_value DECIMAL(10,2),
+    reference_number VARCHAR(100),
+    supplier VARCHAR(200),
+    customer VARCHAR(200),
+    notes TEXT,
+    location_id UUID REFERENCES locations(id),
+    user_id UUID REFERENCES users(id),
+    movement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Create indexes for better performance
 CREATE INDEX idx_stock_items_barcode ON stock_items(barcode);
