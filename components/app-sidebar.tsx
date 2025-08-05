@@ -1,4 +1,4 @@
-import { BarChart3, Box, Home, Package, Settings, TrendingUp, Users, Warehouse } from "lucide-react"
+import { BarChart3, Box, Home, Layers, Package, Settings, TrendingUp, Users, Warehouse } from "lucide-react"
 
 import {
   Sidebar,
@@ -31,11 +31,17 @@ const items = [
     url: "/movements",
     icon: TrendingUp,
   },
+    {
+    title: "Categories",
+    url: "/categories",
+    icon: Layers,
+    key: "categories",
+  },
   {
     title: "Locations",
-    url: "/location",
+    url: "/locations",
     icon: Warehouse,
-    key: "location",
+    key: "locations",
   },
   {
     title: "Reports",
