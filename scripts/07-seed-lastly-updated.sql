@@ -16,7 +16,7 @@ TRUNCATE TABLE
 RESTART IDENTITY CASCADE;
 
 -- ================================
--- Insert Categories
+-- Insert Categories...
 -- ================================
 INSERT INTO categories (id, name, description) VALUES
 (uuid_generate_v4(), 'Hardware', 'Computer hardware components and devices'),
@@ -29,7 +29,7 @@ INSERT INTO categories (id, name, description) VALUES
 (uuid_generate_v4(), 'Office Supplies', 'General office supplies and materials');
 
 -- ================================
--- Insert Subcategories
+-- Insert Subcategories...
 -- ================================
 INSERT INTO subcategories (id, name, category_id) VALUES
 -- Hardware
@@ -75,7 +75,7 @@ INSERT INTO subcategories (id, name, category_id) VALUES
 (uuid_generate_v4(), 'Folders', (SELECT id FROM categories WHERE name = 'Office Supplies'));
 
 -- ================================
--- Insert Locations
+-- Insert Locations...
 -- ================================
 INSERT INTO locations (id, name, code, block, type, status, capacity, manager, description) VALUES
 (uuid_generate_v4(), 'B-Block Storage Room 0', 'B-Block-SR0', 'B-Block', 'storage_room', 'active', 500, 'John Smith', 'Main storage room for hardware components'),
@@ -89,7 +89,7 @@ INSERT INTO locations (id, name, code, block, type, status, capacity, manager, d
 (uuid_generate_v4(), 'Office Storage', 'Office Storage', 'Office', 'office', 'active', 150, 'Admin User', 'Office supplies and small equipment');
 
 -- ================================
--- Insert Users
+-- Insert Users...
 -- ================================
 INSERT INTO users (id, name, email, role, status, location_id, phone, department, join_date) VALUES
 (uuid_generate_v4(), 'John Smith', 'john.smith@company.com', 'admin', 'active', (SELECT id FROM locations WHERE code = 'B-Block-SR0'), '+1-555-0101', 'IT', '2023-01-15'),
@@ -154,7 +154,7 @@ INSERT INTO stock_items (id, name, description, barcode, quantity, unit_price, m
  (SELECT id FROM users WHERE email = 'admin@company.com'));
 
 -- ================================
--- Insert Stock Movements
+-- Insert Stock Movements...
 -- ================================
 INSERT INTO stock_movements (id, item_id, movement_type, quantity, unit_price, total_value, reference_number, supplier, notes, location_id, user_id, movement_date) VALUES
 (uuid_generate_v4(), (SELECT id FROM stock_items WHERE barcode = 'BC001'), 'IN', 20, 250.00, 5000.00, 'PO-2024-001', 'Dell Technologies', 'Initial stock purchase',
