@@ -102,7 +102,7 @@ INSERT INTO users (id, name, email, role, status, location_id, phone, department
 (uuid_generate_v4(), 'Admin User', 'admin@company.com', 'admin', 'active', (SELECT id FROM locations WHERE code = 'Office Storage'), '+1-555-0100', 'Administration', '2023-01-01');
 
 -- ================================
--- Insert Stock Items
+-- Insert Stock Items...
 -- ================================
 INSERT INTO stock_items (id, name, description, barcode, quantity, unit_price, min_quantity, category_id, subcategory_id, location_id, created_by) VALUES
 (uuid_generate_v4(), 'Dell Monitor 24"', '24-inch LED monitor with full HD resolution', 'BC001', 15, 250.00, 5,
