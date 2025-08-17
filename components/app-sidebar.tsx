@@ -1,4 +1,17 @@
-import { BarChart3, Box, Home, Layers, Package, Settings, TrendingUp, Users, Warehouse } from "lucide-react"
+import { 
+  Home, 
+  Package, 
+  BarChart3, 
+  ArrowUpDown, 
+  Layers, 
+  Settings, 
+  Box, 
+  Users, 
+  Warehouse ,
+  Menu, 
+  TrendingUp,
+  AlertTriangle
+} from "lucide-react"
 
 import {
   Sidebar,
@@ -29,7 +42,7 @@ const items = [
   {
     title: "Stock Movements",
     url: "/movements",
-    icon: TrendingUp,
+    icon: ArrowUpDown,
   },
     {
     title: "Categories",
