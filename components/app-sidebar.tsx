@@ -1,9 +1,17 @@
 "use client";
 
-import { Box, Home, Package, BarChart3, ArrowUpDown, Layers, Settings, Users, Warehouse } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { 
+  Home, 
+  Package, 
+  BarChart3, 
+  ArrowUpDown, 
+  Layers, 
+  Settings, 
+  Box, 
+  Users, 
+  Warehouse, 
+} from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -17,22 +25,58 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
+import Link from "next/link";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { usePathname } from "next/navigation";
+
 const items = [
-  { title: "Dashboard", url: "/", icon: Home },
-  { title: "Stock Items", url: "/stocks", icon: Package },
-  { title: "Stock Movements", url: "/movements", icon: ArrowUpDown },
-  { title: "Categories", url: "/categories", icon: Layers, key: "categories" },
-  { title: "Locations", url: "/locations", icon: Warehouse, key: "locations" },
-  { title: "Reports", url: "/reports", icon: BarChart3 },
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: Home,
+  },
+  {
+    title: "Stock Items",
+    url: "/stocks",
+    icon: Package,
+  },
+  {
+    title: "Stock Movements",
+    url: "/movements",
+    icon: ArrowUpDown,
+  },
+  {
+    title: "Categories",
+    url: "/categories",
+    icon: Layers,
+  },
+  {
+    title: "Locations",
+    url: "/locations",
+    icon: Warehouse,
+  },
+  {
+    title: "Reports",
+    url: "/reports",
+    icon: BarChart3,
+  },
 ];
 
 const adminItems = [
-  { title: "Users", url: "/users", icon: Users },
-  { title: "Settings", url: "/settings", icon: Settings },
+  {
+    title: "Users",
+    url: "/users",
+    icon: Users,
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
+  },
 ];
 
 export function AppSidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname(); // ✅ detect current URL
 
   return (
     <Sidebar>
