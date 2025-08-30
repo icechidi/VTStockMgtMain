@@ -12,21 +12,22 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Stock Management System",
   description: "Professional inventory management system",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
-export default function RootLayout({children}: {children: React.ReactNode}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-{/* Wrapped the ThemeProvider  to the main sidebar to allows us to use the theme toggle and manage themes */}
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <SidebarProvider>
-          <AppSidebar activeTab="dashboard" onTabChange={() => {}} />
-          <main className="flex-1 overflow-auto">{children}</main>
-        </SidebarProvider>
-        <Toaster />
-      </ThemeProvider>
+        {/* Wrap the ThemeProvider so the sidebar can use theme toggle */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SidebarProvider>
+            {/* ✅ Removed activeTab/onTabChange props */}
+            <AppSidebar />
+            <main className="flex-1 overflow-auto">{children}</main>
+          </SidebarProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )
