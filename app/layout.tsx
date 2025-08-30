@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Wrap the ThemeProvider so the sidebar can use theme toggle */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <SidebarProvider>
-            {/* ✅ Removed activeTab/onTabChange props */}
+            {/* Removed activeTab/onTabChange props */}
             <AppSidebar />
             <main className="flex-1 overflow-auto">{children}</main>
           </SidebarProvider>
