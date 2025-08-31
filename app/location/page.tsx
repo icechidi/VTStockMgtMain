@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,7 +17,8 @@ import {
 } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Plus, Edit, Trash2, Search, Building, Package } from "lucide-react"
+import { MapPin, Plus, Edit, Trash2, Search, Building, Package, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface Location {
   id: string
@@ -27,13 +27,21 @@ interface Location {
   block: string
   status: "active" | "inactive"
   capacity: number
-  currentItems: number
   type: "storage_room" | "office"
   manager?: string
   description?: string
+  address?: string
+  city?: string
+  country?: string
+  phone?: string
+  email?: string
+  item_count: number
+  total_value: number
+  created_at: string
+  updated_at: string
 }
 
-const stockLocations = [
+const stockLocationCodes = [
   "B-Block-SR0",
   "B-Block-SR1",
   "B-Block-SR2",
@@ -45,76 +53,48 @@ const stockLocations = [
   "Office Storage",
 ]
 
-const mockLocations: Location[] = [
-  {
-    id: "1",
-    name: "B-Block Storage Room 0",
-    code: "B-Block-SR0",
-    block: "B-Block",
-    status: "active",
-    capacity: 500,
-    currentItems: 245,
-    type: "storage_room",
-    manager: "John Smith",
-    description: "Main storage room for hardware components",
-  },
-  {
-    id: "2",
-    name: "B-Block Storage Room 1",
-    code: "B-Block-SR1",
-    block: "B-Block",
-    status: "active",
-    capacity: 300,
-    currentItems: 180,
-    type: "storage_room",
-    manager: "Jane Doe",
-    description: "Secondary storage for accessories",
-  },
-  {
-    id: "3",
-    name: "A-Block Storage Room 0",
-    code: "A-Block-SR0",
-    block: "A-Block",
-    status: "active",
-    capacity: 400,
-    currentItems: 320,
-    type: "storage_room",
-    manager: "Mike Johnson",
-    description: "Software and networking equipment storage",
-  },
-  {
-    id: "4",
-    name: "Office Storage",
-    code: "Office Storage",
-    block: "Office",
-    status: "active",
-    capacity: 150,
-    currentItems: 85,
-    type: "office",
-    manager: "Sarah Wilson",
-    description: "Office supplies and small equipment",
-  },
-  {
-    id: "5",
-    name: "B-Block Storage Room 2",
-    code: "B-Block-SR2",
-    block: "B-Block",
-    status: "inactive",
-    capacity: 250,
-    currentItems: 0,
-    type: "storage_room",
-    description: "Under maintenance",
-  },
-]
-
-export default function LocationsPageUpdated() {
-  const [locations, setLocations] = useState<Location[]>(mockLocations)
+export function LocationsPageDatabase() {
+  const [locations, setLocations] = useState<Location[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [blockFilter, setBlockFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
   const [formData, setFormData] = useState<Partial<Location>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  // Fetch locations from database
+  const fetchLocations = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/locations")
+      if (response.ok) {
+        const data = await response.json()
+        setLocations(data)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch locations",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching locations:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch locations",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLocations()
+  }, [])
 
   const filteredLocations = locations.filter((location) => {
     const matchesSearch =
@@ -132,7 +112,7 @@ export default function LocationsPageUpdated() {
       status: "active",
       type: "storage_room",
       capacity: 100,
-      currentItems: 0,
+      block: "",
     })
     setIsDialogOpen(true)
   }
@@ -143,32 +123,103 @@ export default function LocationsPageUpdated() {
     setIsDialogOpen(true)
   }
 
-  const handleDeleteLocation = (id: string) => {
-    setLocations(locations.filter((loc) => loc.id !== id))
+  const handleDeleteLocation = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this location? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/locations/${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Location deleted successfully",
+        })
+        fetchLocations()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to delete location",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting location:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete location",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editingLocation) {
-      setLocations(locations.map((loc) => (loc.id === editingLocation.id ? { ...loc, ...formData } : loc)))
-    } else {
-      const newLocation: Location = {
-        ...formData,
-        id: Date.now().toString(),
-        block: formData.code?.includes("A-Block")
-          ? "A-Block"
-          : formData.code?.includes("B-Block")
-            ? "B-Block"
-            : "Office",
-      } as Location
-      setLocations([...locations, newLocation])
+
+    if (!formData.name || !formData.code) {
+      toast({
+        title: "Error",
+        description: "Name and code are required",
+        variant: "destructive",
+      })
+      return
     }
-    setIsDialogOpen(false)
-    setFormData({})
+
+    setIsSubmitting(true)
+    try {
+      const url = editingLocation ? `/api/locations/${editingLocation.id}` : "/api/locations"
+      const method = editingLocation ? "PUT" : "POST"
+
+      // Determine block from code if not set
+      const block =
+        formData.block ||
+        (formData.code?.includes("A-Block") ? "A-Block" : formData.code?.includes("B-Block") ? "B-Block" : "Office")
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formData,
+          block,
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: `Location ${editingLocation ? "updated" : "created"} successfully`,
+        })
+        setIsDialogOpen(false)
+        setFormData({})
+        fetchLocations()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || `Failed to ${editingLocation ? "update" : "create"} location`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving location:", error)
+      toast({
+        title: "Error",
+        description: `Failed to ${editingLocation ? "update" : "create"} location`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getUtilizationPercentage = (current: number, capacity: number) => {
-    return Math.round((current / capacity) * 100)
+    return capacity > 0 ? Math.round((current / capacity) * 100) : 0
   }
 
   const getUtilizationColor = (percentage: number) => {
@@ -178,9 +229,19 @@ export default function LocationsPageUpdated() {
   }
 
   const totalCapacity = locations.reduce((sum, loc) => sum + loc.capacity, 0)
-  const totalCurrentItems = locations.reduce((sum, loc) => sum + loc.currentItems, 0)
+  const totalCurrentItems = locations.reduce((sum, loc) => sum + loc.item_count, 0)
   const activeLocations = locations.filter((loc) => loc.status === "active").length
+  const totalValue = locations.reduce((sum, loc) => sum + Number(loc.total_value), 0)
   const blocks = Array.from(new Set(locations.map((loc) => loc.block)))
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading locations...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -225,14 +286,12 @@ export default function LocationsPageUpdated() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Items</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
             <Package className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCurrentItems}</div>
-            <div className="text-xs text-muted-foreground">
-              {Math.round((totalCurrentItems / totalCapacity) * 100)}% utilized
-            </div>
+            <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground">{totalCurrentItems} items stored</div>
           </CardContent>
         </Card>
       </div>
@@ -283,7 +342,8 @@ export default function LocationsPageUpdated() {
                 <TableHead>Location Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Block</TableHead>
-                <TableHead>Utilization</TableHead>
+                <TableHead>Items / Capacity</TableHead>
+                <TableHead>Value</TableHead>
                 <TableHead>Manager</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
@@ -291,7 +351,7 @@ export default function LocationsPageUpdated() {
             </TableHeader>
             <TableBody>
               {filteredLocations.map((location) => {
-                const utilization = getUtilizationPercentage(location.currentItems, location.capacity)
+                const utilization = getUtilizationPercentage(location.item_count, location.capacity)
                 return (
                   <TableRow key={location.id}>
                     <TableCell>
@@ -309,7 +369,7 @@ export default function LocationsPageUpdated() {
                     <TableCell>
                       <div className="flex flex-col">
                         <div className="text-sm">
-                          <span className={getUtilizationColor(utilization)}>{location.currentItems}</span>
+                          <span className={getUtilizationColor(utilization)}>{location.item_count}</span>
                           <span className="text-muted-foreground"> / {location.capacity}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
@@ -317,11 +377,14 @@ export default function LocationsPageUpdated() {
                             className={`h-2 rounded-full ${
                               utilization >= 90 ? "bg-red-500" : utilization >= 70 ? "bg-yellow-500" : "bg-green-500"
                             }`}
-                            style={{ width: `${utilization}%` }}
+                            style={{ width: `${Math.min(utilization, 100)}%` }}
                           ></div>
                         </div>
                         <div className="text-xs text-muted-foreground">{utilization}%</div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">${Number(location.total_value).toLocaleString()}</div>
                     </TableCell>
                     <TableCell>{location.manager || "Unassigned"}</TableCell>
                     <TableCell>
@@ -366,7 +429,7 @@ export default function LocationsPageUpdated() {
                       <SelectValue placeholder="Select location code" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stockLocations.map((location) => (
+                      {stockLocationCodes.map((location) => (
                         <SelectItem key={location} value={location}>
                           {location}
                         </SelectItem>
@@ -405,14 +468,19 @@ export default function LocationsPageUpdated() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currentItems">Current Items</Label>
-                  <Input
-                    id="currentItems"
-                    type="number"
-                    min="0"
-                    value={formData.currentItems || ""}
-                    onChange={(e) => setFormData({ ...formData, currentItems: Number(e.target.value) })}
-                  />
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={formData.type || ""}
+                    onValueChange={(value) => setFormData({ ...formData, type: value as Location["type"] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="storage_room">Storage Room</SelectItem>
+                      <SelectItem value="office">Office</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -440,12 +508,58 @@ export default function LocationsPageUpdated() {
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={formData.address || ""}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={formData.city || ""}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone || ""}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email || ""}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit">{editingLocation ? "Update" : "Create"} Location</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingLocation ? "Updating..." : "Creating..."}
+                  </>
+                ) : (
+                  `${editingLocation ? "Update" : "Create"} Location`
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
