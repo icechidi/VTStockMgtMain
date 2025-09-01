@@ -53,7 +53,7 @@ const stockLocationCodes = [
   "Office Storage",
 ]
 
-export function LocationsPageDatabase() {
+export default function LocationsPageDatabase() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
