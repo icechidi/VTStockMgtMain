@@ -10,6 +10,7 @@ import {
   Box, 
   Users, 
   Warehouse, 
+  Bell, // <-- Add Bell icon for Alerts
 } from "lucide-react";
 
 import {
@@ -59,6 +60,11 @@ const items = [
     title: "Reports",
     url: "/reports",
     icon: BarChart3,
+  },
+  {
+    title: "Alerts", // <-- Add Alerts menu item
+    url: "/alerts",
+    icon: Bell,
   },
 ];
 
