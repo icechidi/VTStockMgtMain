@@ -34,7 +34,7 @@ interface Subcategory {
   category_id: string
 }
 
-export function CategoriesPage() {
+export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
