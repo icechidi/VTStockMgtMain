@@ -56,10 +56,22 @@ export async function GET(request: NextRequest) {
       ORDER BY ds.date
     `)
 
-    chartData = result.rows.map((row) => ({
+    interface ChartRow {
+      day: string
+      stock_in: string | number
+      stock_out: string | number
+    }
+
+    interface ChartData {
+      day: string
+      stockIn: number
+      stockOut: number
+    }
+
+    chartData = (result.rows as ChartRow[]).map((row): ChartData => ({
       day: row.day,
-      stockIn: Number.parseInt(row.stock_in),
-      stockOut: Number.parseInt(row.stock_out),
+      stockIn: Number.parseInt(row.stock_in as string),
+      stockOut: Number.parseInt(row.stock_out as string),
     }))
 
     return NextResponse.json(chartData)
