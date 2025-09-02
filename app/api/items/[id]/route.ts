@@ -3,91 +3,52 @@ import { query } from "@/lib/database"
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
-    const body = await request.json()
-    const { name, description, category, unit_price, min_quantity, max_quantity, location } = body
+    const { name, description, barcode, quantity, unit_price, min_quantity, category_id, subcategory_id, location_id } =
+      await request.json()
+    const { id } = params
 
-    // Get category_id and location_id if provided
-    let category_id = null
-    let location_id = null
-
-    if (category) {
-      const categoryResult = await query("SELECT id FROM categories WHERE name = $1", [category])
-      category_id = categoryResult.rows[0]?.id
+    if (!name || quantity === undefined || unit_price === undefined) {
+      return NextResponse.json({ error: "Name, quantity, and unit_price are required" }, { status: 400 })
     }
 
-    if (location) {
-      const locationResult = await query("SELECT id FROM locations WHERE name = $1", [location])
-      location_id = locationResult.rows[0]?.id
-    }
-
-    // Update item
     const result = await query(
       `
       UPDATE stock_items 
-      SET 
-        name = COALESCE($1, name),
-        description = COALESCE($2, description),
-        category_id = COALESCE($3, category_id),
-        unit_price = COALESCE($4, unit_price),
-        min_quantity = COALESCE($5, min_quantity),
-        max_quantity = COALESCE($6, max_quantity),
-        location_id = COALESCE($7, location_id),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
+      SET name = $1, description = $2, barcode = $3, quantity = $4, unit_price = $5, 
+          min_quantity = $6, category_id = $7, subcategory_id = $8, location_id = $9
+      WHERE id = $10 
       RETURNING *
     `,
-      [name, description, category_id, unit_price, min_quantity, max_quantity, location_id, id],
+      [name, description, barcode, quantity, unit_price, min_quantity, category_id, subcategory_id, location_id, id],
     )
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 })
+      return NextResponse.json({ error: "Stock item not found" }, { status: 404 })
     }
 
-    // Get the complete updated item
-    const itemResult = await query(
-      `
-      SELECT 
-        si.id,
-        si.name,
-        si.description,
-        si.sku,
-        si.unit_price,
-        si.quantity,
-        si.min_quantity,
-        si.max_quantity,
-        si.updated_at,
-        c.name as category,
-        l.name as location
-      FROM stock_items si
-      LEFT JOIN categories c ON si.category_id = c.id
-      LEFT JOIN locations l ON si.location_id = l.id
-      WHERE si.id = $1
-    `,
-      [id],
-    )
-
-    return NextResponse.json(itemResult.rows[0])
-  } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to update item" }, { status: 500 })
+    return NextResponse.json(result.rows[0])
+  } catch (error: any) {
+    console.error("Error updating stock item:", error)
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "Barcode already exists" }, { status: 409 })
+    }
+    return NextResponse.json({ error: "Failed to update stock item" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = Number.parseInt(params.id)
+    const { id } = params
 
-    // Soft delete by setting is_active to false
-    const result = await query("UPDATE stock_items SET is_active = false WHERE id = $1 RETURNING id", [id])
+    const result = await query("DELETE FROM stock_items WHERE id = $1 RETURNING *", [id])
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 })
+      return NextResponse.json({ error: "Stock item not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "Stock item deleted successfully" })
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to delete item" }, { status: 500 })
+    console.error("Error deleting stock item:", error)
+    return NextResponse.json({ error: "Failed to delete stock item" }, { status: 500 })
   }
 }
