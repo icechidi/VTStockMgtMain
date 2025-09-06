@@ -3,13 +3,26 @@ import { query } from "@/lib/database"
 
 export async function GET() {
   try {
-    const result = await query(`
-      SELECT * FROM get_low_stock_items()
-    `)
+    const result = await query(
+      `
+      SELECT 
+        id,
+        name,
+        quantity,
+        min_quantity
+      FROM stock_items
+      WHERE is_active = true
+        AND quantity <= min_quantity
+      ORDER BY quantity ASC, name ASC
+      `
+    )
 
     return NextResponse.json(result.rows)
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to fetch low stock items" }, { status: 500 })
+    console.error("Database error (low-stock):", error)
+    return NextResponse.json(
+      { error: "Failed to fetch low stock items" },
+      { status: 500 }
+    )
   }
 }
