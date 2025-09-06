@@ -31,15 +31,8 @@ export function RecentMovements() {
       }
     } catch (error) {
       console.error("Error fetching recent movements:", error)
-      // Fallback data
       setMovements([
-        {
-          id: 1,
-          item_name: "Laptop Dell XPS",
-          movement_type: "IN",
-          quantity: 5,
-          movement_date: new Date().toISOString(),
-        },
+        { id: 1, item_name: "Laptop Dell XPS", movement_type: "IN", quantity: 5, movement_date: new Date().toISOString() },
         { id: 2, item_name: "iPhone 13", movement_type: "OUT", quantity: 2, movement_date: new Date().toISOString() },
         { id: 3, item_name: "HP Printer", movement_type: "IN", quantity: 3, movement_date: new Date().toISOString() },
       ])
@@ -48,29 +41,25 @@ export function RecentMovements() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     })
-  }
 
   return (
-    // Recent movements card
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Recent Movements</CardTitle>
         <Link href="/movements">
-          <Button variant="outline" size="sm">
-            View All
-          </Button>
+          <Button variant="outline" size="sm">View All</Button>
         </Link>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="space-y-3">
+          <div className="h-72 space-y-3 overflow-hidden">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-center justify-between p-3 border rounded">
                 <div className="space-y-2">
@@ -82,19 +71,11 @@ export function RecentMovements() {
             ))}
           </div>
         ) : (
-          // Display recent movements and ensure consistent height & overflow handling
-          <div className="space-y-3 overflow-y-auto"
-              style={{
-              maxHeight: "295px", // 4 items * 68px (adjust if your item height changes)
-              minHeight: "68px",
-              paddingRight: "4px",
-            }}
-            >
+          <div className="h-72 overflow-y-auto pr-1 space-y-3">
             {movements.map((movement) => (
-              <div 
-                key={movement.id} 
-                className="flex items-center justify-between p-3 border rounded hover:bg-gray-50  dark:hover:bg-gray-800"
-                style={{ minHeight: "68px" }} // Ensure consistent height per item
+              <div
+                key={movement.id}
+                className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-800 min-h-[68px]"
               >
                 <div>
                   <div className="font-medium">{movement.item_name}</div>
@@ -109,7 +90,9 @@ export function RecentMovements() {
               </div>
             ))}
             {movements.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">No recent movements found</div>
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                No recent movements found
+              </div>
             )}
           </div>
         )}
