@@ -3,15 +3,14 @@ import { query } from "@/lib/database";
 
 export async function GET() {
   try {
-    // Check DB connection
-    const result = await query("SELECT NOW() AS current_time;");
+    const result = await query("SELECT version();");
 
     return NextResponse.json({
       status: "ok",
       server: "running",
       database: {
-        status: "connected",
-        time: result.rows[0].current_time,
+        connected: true,
+        version: result.rows[0].version,
       },
       timestamp: new Date().toISOString(),
     });
@@ -23,8 +22,8 @@ export async function GET() {
         status: "error",
         server: "running",
         database: {
-          status: "disconnected",
-          error: (error as Error).message,
+          connected: false,
+          error: (error as Error).message || "Database connection failed",
         },
         timestamp: new Date().toISOString(),
       },
