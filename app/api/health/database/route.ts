@@ -3,15 +3,20 @@ import { query } from "@/lib/database";
 
 export async function GET() {
   try {
-    const result = await query("SELECT NOW() AS current_time;");
+    // You can fetch DB version for more useful info
+    const result = await query("SELECT version();");
+
     return NextResponse.json({
-      status: "ok",
-      databaseTime: result.rows[0].current_time,
+      connected: true,
+      version: result.rows[0].version,
     });
   } catch (error) {
     console.error("Database health check failed:", error);
     return NextResponse.json(
-      { status: "error", message: "Database connection failed" },
+      {
+        connected: false,
+        error: (error as Error).message || "Database connection failed",
+      },
       { status: 500 }
     );
   }
