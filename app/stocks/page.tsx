@@ -467,6 +467,15 @@ export default function InventoryPageDatabase() {
         </div>
       </div>
 
+      {/* TOP Analytics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Total Items</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.length}</div></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Total Value</CardTitle><BarChart3 className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold">${inventory.reduce((sum,item)=>sum+item.unit_price*item.quantity,0).toLocaleString()}</div></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Low Stock</CardTitle><Package className="h-4 w-4 text-yellow-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="low_stock").length}</div></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-sm font-medium">Out of Stock</CardTitle><Package className="h-4 w-4 text-red-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="out_of_stock").length}</div></CardContent></Card>
+      </div>
+
+      
       {/* Tabs: All Items / Low Stock / Analytics */}
       <Tabs defaultValue="all-items" className="space-y-4">
         <TabsList>
@@ -620,6 +629,7 @@ export default function InventoryPageDatabase() {
               </div>
             </CardContent>
           </Card>
+
 
           {/* View Toggle */}
           <div className="flex items-center justify-between">
