@@ -121,7 +121,7 @@ CREATE TABLE stock_movements (
     created_by UUID REFERENCES users(id),
     movement_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    
+    ADD COLUMN created_by UUID REFERENCES users(id);
 );
 
 -- Indexes for performance

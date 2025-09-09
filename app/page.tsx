@@ -4,6 +4,7 @@ import { RecentMovements } from "@/components/recent-movements"
 import { LowStockAlerts } from "@/components/low-stock-alerts"
 import { QuickActions } from "@/components/quick-actions"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { MovementStats } from "@/components/movement-stats"
 
 export default function Dashboard() {
   return (
@@ -19,7 +20,7 @@ export default function Dashboard() {
       </div>
 
       <DashboardStats />
-      <QuickActions />
+
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <div className="col-span-4">
@@ -29,8 +30,18 @@ export default function Dashboard() {
           <RecentMovements />
         </div>
       </div>
+    
+          
 
-      <LowStockAlerts />
+              <div className="grid gap-6 md:grid-cols-2">
+                <LowStockAlerts />
+                <QuickActions />
+               
+              </div>
+          <MovementStats movements={[]} />
+          <MovementStats movements={[]} />
+          
+
     </div>
     
   )
