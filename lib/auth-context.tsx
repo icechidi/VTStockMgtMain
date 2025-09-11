@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import Cookies from "js-cookie"
 
 interface User {
   id: string
@@ -36,13 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is logged in on app start
     checkAuthStatus()
   }, [])
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem("auth_token")
+      const token = Cookies.get("auth_token")
       if (token) {
         const response = await fetch("/api/auth/me", {
           headers: {
@@ -53,12 +53,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = await response.json()
           setUser(userData)
         } else {
-          localStorage.removeItem("auth_token")
+          Cookies.remove("auth_token")
+          setUser(null)
         }
+      } else {
+        setUser(null)
       }
     } catch (error) {
       console.error("Auth check failed:", error)
-      localStorage.removeItem("auth_token")
+      Cookies.remove("auth_token")
+      setUser(null)
     } finally {
       setIsLoading(false)
     }
@@ -76,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const { user: userData, token } = await response.json()
-        localStorage.setItem("auth_token", token)
+        Cookies.set("auth_token", token)
         setUser(userData)
         return true
       }
@@ -88,13 +92,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("auth_token")
+    Cookies.remove("auth_token")
     setUser(null)
   }
 
   const updateProfile = async (data: Partial<User>): Promise<boolean> => {
     try {
-      const token = localStorage.getItem("auth_token")
+      const token = Cookies.get("auth_token")
       const response = await fetch("/api/auth/profile", {
         method: "PUT",
         headers: {
@@ -118,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<boolean> => {
     try {
-      const token = localStorage.getItem("auth_token")
+      const token = Cookies.get("auth_token")
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: {
@@ -140,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const formData = new FormData()
       formData.append("avatar", file)
 
-      const token = localStorage.getItem("auth_token")
+      const token = Cookies.get("auth_token")
       const response = await fetch("/api/auth/upload-avatar", {
         method: "POST",
         headers: {
