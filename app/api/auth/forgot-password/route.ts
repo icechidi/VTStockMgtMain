@@ -10,14 +10,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const result = await query("SELECT id, email, name FROM users WHERE email = $1 AND status = 'active'", [email])
+    const userResult = await query("SELECT id FROM users WHERE email = $1 AND status = 'active'", [email.toLowerCase()])
 
-    if (result.rows.length === 0) {
-      // Don't reveal if email exists or not for security
-      return NextResponse.json({ message: "If the email exists, a reset code has been sent." })
+    // Always return success to prevent email enumeration
+    if (userResult.rows.length === 0) {
+      return NextResponse.json({ message: "If the email exists, a reset code has been sent" })
     }
 
-    const user = result.rows[0]
+    const userId = userResult.rows[0].id
 
     // Generate 6-digit reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString()
@@ -25,21 +25,17 @@ export async function POST(request: NextRequest) {
 
     // Store reset code in database
     await query(
-      `INSERT INTO password_reset_codes (user_id, email, code, expires_at) 
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) 
-       DO UPDATE SET code = $3, expires_at = $4, created_at = NOW()`,
-      [user.id, email, resetCode, expiresAt],
+      `INSERT INTO password_reset_codes (user_id, code, expires_at) 
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) 
+       DO UPDATE SET code = $2, expires_at = $3, created_at = NOW()`,
+      [userId, resetCode, expiresAt],
     )
 
-    // In a real application, send email here
+    // In a real application, you would send an email here
     console.log(`Password reset code for ${email}: ${resetCode}`)
 
-    return NextResponse.json({
-      message: "If the email exists, a reset code has been sent.",
-      // For demo purposes, include the code in response
-      resetCode: process.env.NODE_ENV === "development" ? resetCode : undefined,
-    })
+    return NextResponse.json({ message: "If the email exists, a reset code has been sent" })
   } catch (error) {
     console.error("Forgot password error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
