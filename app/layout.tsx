@@ -4,34 +4,39 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
-import { Toaster } from "@/components/ui/toaster"
+import { TopNav } from "@/components/top-nav"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/lib/auth-context"
-import { ProtectedRoute } from "@/components/protected-route"
+import { Toaster } from "@/components/ui/toaster"
+
+import { NextAuthSessionProvider } from "@/components/session-provider"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Stock Management System",
+  title: "VT-Stock Management System",
   description: "Professional inventory management system",
-  generator: "v0.dev",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session: import("next-auth").Session | null = await getServerSession(authOptions);
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {/* Wrap the ThemeProvider so the sidebar can use theme toggle */}
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>
-            <ProtectedRoute>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <NextAuthSessionProvider session={session}>
             <SidebarProvider>
-              {/* Removed activeTab/onTabChange props */}
-              <AppSidebar />
-              <main className="flex-1 overflow-auto">{children}</main>
+              <div className="flex min-h-screen">
+                <AppSidebar />
+                <div className="flex flex-1 flex-col">
+                  <TopNav />
+                  <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
+                </div>
+              </div>
             </SidebarProvider>
-            </ProtectedRoute>
-          </AuthProvider>
+          </NextAuthSessionProvider>
           <Toaster />
         </ThemeProvider>
       </body>
