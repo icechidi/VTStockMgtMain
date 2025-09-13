@@ -6,9 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function PUT(request: NextRequest) {
   try {
-    const token =
-      request.headers.get("authorization")?.replace("Bearer ", "") || request.cookies.get("auth_token")?.value
-
+    const token = request.headers.get("authorization")?.replace("Bearer ", "")
     if (!token) {
       return NextResponse.json({ error: "No token provided" }, { status: 401 })
     }
@@ -19,9 +17,9 @@ export async function PUT(request: NextRequest) {
     const result = await query(
       `UPDATE users 
        SET name = $1, email = $2, phone = $3, department = $4, updated_at = NOW()
-       WHERE id = $5 
+       WHERE id = $5 AND status = 'active'
        RETURNING *`,
-      [name, email, phone, department, decoded.userId],
+      [name, email.toLowerCase(), phone, department, decoded.userId],
     )
 
     if (result.rows.length === 0) {
@@ -32,6 +30,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(user)
   } catch (error) {
     console.error("Profile update error:", error)
-    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
