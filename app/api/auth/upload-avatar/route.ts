@@ -8,9 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function POST(request: NextRequest) {
   try {
-    const token =
-      request.headers.get("authorization")?.replace("Bearer ", "") || request.cookies.get("auth_token")?.value
-
+    const token = request.headers.get("authorization")?.replace("Bearer ", "")
     if (!token) {
       return NextResponse.json({ error: "No token provided" }, { status: 401 })
     }
@@ -35,11 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Create uploads directory if it doesn't exist
     const uploadsDir = path.join(process.cwd(), "public", "uploads", "avatars")
-    try {
-      await mkdir(uploadsDir, { recursive: true })
-    } catch (error) {
-      // Directory might already exist
-    }
+    await mkdir(uploadsDir, { recursive: true })
 
     // Generate unique filename
     const fileExtension = path.extname(file.name)
@@ -58,6 +52,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ avatarUrl })
   } catch (error) {
     console.error("Avatar upload error:", error)
-    return NextResponse.json({ error: "Failed to upload avatar" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
