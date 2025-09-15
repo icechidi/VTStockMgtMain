@@ -10,6 +10,7 @@
     "db:setup": "psql -U postgres -d VTStockDB -f scripts/06-seed-data.sql"
   },
   "dependencies": {
+    "@auth/pg-adapter": "^1.10.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -45,12 +46,15 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "cookie": "^1.0.2",
     "date-fns": "latest",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
+    "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.454.0",
     "next": "14.2.16",
+    "next-auth": "^4.24.11",
     "next-themes": "^0.4.4",
     "pg": "latest",
     "pg-native": "latest",
@@ -67,7 +71,11 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/cookie": "^0.6.0",
+    "@types/js-cookie": "^3.0.6",
+    "@types/next-auth": "^3.13.0",
     "@types/node": "^22",
+    "@types/pg": "^8.15.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "postcss": "^8.5",
