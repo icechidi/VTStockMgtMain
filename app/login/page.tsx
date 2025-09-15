@@ -31,12 +31,13 @@ export default function LoginPage() {
   useEffect(() => {
     // Check if user is already logged in
     const checkSession = async () => {
-      const session = await getSession()
-      if (session) {
-        router.push("/dashboard")
+      const session = await getSession();
+      console.log("Session on login page:", session); // Add this line
+      if (session?.user?.id) {
+        router.replace("/dashboard");
       }
-    }
-    checkSession()
+    };
+    checkSession();
   }, [router])
 
 
