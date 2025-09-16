@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { authOptions } from "@/lib/auth"
 
 import { DashboardStats } from "@/components/dashboard-stats"
 import { StockChart } from "@/components/stock-chart"
@@ -11,10 +11,13 @@ import { LowStockAlerts } from "@/components/low-stock-alerts"
 import { QuickActions } from "@/components/quick-actions"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { MovementStats } from "@/components/movement-stats"
+import { useSession } from "next-auth/react"
 
 export default function Dashboard() {
-  const { user, isLoading } = useAuth()
+  const { data: session, status } = useSession()
   const router = useRouter()
+  const isLoading = status === "loading"
+  const user = session?.user
 
   // Client-side redirect if not authenticated (middleware covers this on server)
   useEffect(() => {
