@@ -1,46 +1,43 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/database"
+// app/api/change-password/route.ts
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
 import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
+import { query } from "@/lib/database"
+import authOptions from "@/lib/auth"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const token = request.headers.get("authorization")?.replace("Bearer ", "")
-    if (!token) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 })
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    const { currentPassword, newPassword } = await request.json()
+    const { currentPassword, newPassword } = await req.json()
 
-    // Get current user
-    const userResult = await query("SELECT password_hash FROM users WHERE id = $1 AND status = 'active'", [
-      decoded.userId,
+    // Fetch current user
+    const result = await query("SELECT password FROM users WHERE id = $1 AND status = 'active'", [
+      session.user.id,
     ])
-
-    if (userResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const user = userResult.rows[0]
+    const user = result.rows[0]
 
     // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash)
-    if (!isValidPassword) {
+    const isValid = await bcrypt.compare(currentPassword, user.password)
+    if (!isValid) {
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 })
     }
 
     // Hash new password
-    const saltRounds = 12
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds)
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
 
-    // Update password
-    await query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2", [
-      hashedPassword,
-      decoded.userId,
-    ])
+    // Update password and clear must_change_password if needed
+    await query(
+      "UPDATE users SET password = $1, must_change_password = false, updated_at = NOW() WHERE id = $2",
+      [hashedPassword, session.user.id]
+    )
 
     return NextResponse.json({ message: "Password changed successfully" })
   } catch (error) {
