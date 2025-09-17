@@ -1,17 +1,16 @@
 // middleware.ts
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 const PUBLIC_PATHS = [
   "/login",
-  "/api/auth/login",
-  "/api/auth/me",
-  "/api/auth/logout",
+  "/change-password",
   "/api/health",
   "/api/health/database",
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
-]
+];
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -23,49 +22,59 @@ const PROTECTED_PREFIXES = [
   "/locations",
   "/reports",
   "/alerts",
-]
+];
 
-// helper
 function isPublic(pathname: string) {
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true
-  if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname.startsWith("/fonts")) return true
-  // allow common static files
-  if (/\.[^/]+$/.test(pathname)) return true
-  return false
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true;
+  if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname.startsWith("/fonts")) return true;
+  if (/\.[^/]+$/.test(pathname)) return true;
+  return false;
 }
 
-export function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname
+export async function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
 
-  // Always allow public paths and assets
+  // Allow public paths right away; redirect "/" or "/login" appropriately if user is signed in
   if (isPublic(pathname)) {
-    // If user has token and tries to access /login or /, redirect to dashboard
-    const token = req.cookies.get("auth_token")?.value
-    if (token && (pathname === "/login" || pathname === "/")) {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
+    if (pathname === "/" || pathname === "/login") {
+      const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+      if (token) {
+        // If user must change password, send them there instead
+        if ((token as any).must_change_password) {
+          return NextResponse.redirect(new URL("/change-password", req.url));
+        }
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
     }
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  // For protected prefixes, require token
-  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  // For protected prefixes, require NextAuth token/session
+  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (needsAuth) {
-    const token = req.cookies.get("auth_token")?.value
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
-      const loginUrl = new URL("/login", req.url)
-      loginUrl.searchParams.set("from", pathname)
-      return NextResponse.redirect(loginUrl)
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("from", pathname);
+      return NextResponse.redirect(loginUrl);
     }
-    // If token exists, allow (optionally validate token here)
-    return NextResponse.next()
+
+    // If user is required to change password, redirect them to /change-password
+    if ((token as any).must_change_password && pathname !== "/change-password") {
+      const changeUrl = new URL("/change-password", req.url);
+      changeUrl.searchParams.set("returnUrl", pathname);
+      return NextResponse.redirect(changeUrl);
+    }
+
+    // token exists and not required to change password -> allow
+    return NextResponse.next();
   }
 
-  // Default: allow
-  return NextResponse.next()
+  // default allow
+  return NextResponse.next();
 }
 
 export const config = {
-  // match root + protected paths + login so middleware handles navigation to them
   matcher: [
     "/",
     "/login",
@@ -80,4 +89,4 @@ export const config = {
     "/alerts/:path*",
     "/api/health/:path*",
   ],
-}
+};
