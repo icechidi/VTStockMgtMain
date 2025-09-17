@@ -121,7 +121,7 @@ export function TopNav() {
       </Sheet>
 
       <div className="w-full flex-1">
-        <h1 className="text-lg font-semibold md:text-2xl">Inventory Management System</h1>
+        <h1 className="text-lg font-semibold md:text-2xl"></h1>
       </div>
 
       {/* Notifications */}
