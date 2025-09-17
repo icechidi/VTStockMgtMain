@@ -88,33 +88,40 @@ export const authOptions: NextAuthOptions = {
           }
           console.log(`[auth] detected hashed-password in column "${detectedColumn}" (len=${hashed.length})`);
 
+          // Check password against detected hash
           const isValid = await bcrypt.compare(credentials.password, hashed);
           console.log("[auth] bcrypt.compare =>", isValid);
           if (!isValid) return null;
 
-          // optional: require active status
+          // Require active status
           if (dbUser.status && dbUser.status !== "active") {
             console.log("[auth] user not active:", dbUser.status);
             return null;
           }
 
-          // update last_login
+          // If flagged to change password, do not fail the sign-in:
+          // instead return the user object and include must_change_password so it flows into token/session.
+          const mustChange = Boolean(dbUser.must_change_password);
+
+          // Update last_login (best-effort)
           try {
             await pool.query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [dbUser.id]);
           } catch (err) {
             console.warn("[auth] last_login update failed:", (err as Error).message);
           }
 
+          // Return safe user object + must_change_password flag
           return {
             id: dbUser.id?.toString() ?? null,
             name: dbUser.name ?? null,
             email: dbUser.email ?? null,
-            image: dbUser.image ?? null,
+            image: (dbUser as any).image ?? null,
             role: dbUser.role ?? null,
             department: dbUser.department ?? null,
             phone: dbUser.phone ?? null,
             status: dbUser.status ?? null,
             location_id: dbUser.location_id ?? null,
+            must_change_password: mustChange,
           };
         } catch (err) {
           console.error("[auth] authorize error:", err);
@@ -127,23 +134,29 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.sub = user.id;
-        token.role = user.role ?? null;
-        token.department = user.department ?? null;
-        token.phone = user.phone ?? null;
-        token.status = user.status ?? null;
-        token.location_id = user.location_id ?? null;
+        token.sub = (user as any).id ?? token.sub;
+        token.role = (user as any).role ?? token.role;
+        token.department = (user as any).department ?? token.department;
+        token.phone = (user as any).phone ?? token.phone;
+        token.status = (user as any).status ?? token.status;
+        token.location_id = (user as any).location_id ?? token.location_id;
+        // carry must_change_password into token
+        if ((user as any).must_change_password !== undefined) {
+          token.must_change_password = Boolean((user as any).must_change_password);
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session?.user) {
-        session.user.id = token.sub ?? (token as any).id ?? session.user.id ?? null;
-        session.user.role = (token as any).role ?? session.user.role ?? null;
-        session.user.department = (token as any).department ?? session.user.department ?? null;
-        session.user.phone = (token as any).phone ?? session.user.phone ?? null;
-        session.user.status = (token as any).status ?? session.user.status ?? null;
-        session.user.location_id = (token as any).location_id ?? session.user.location_id ?? null;
+        session.user.id = token.sub ?? session.user.id ?? null;
+        (session.user as any).role = (token as any).role ?? session.user.role ?? null;
+        (session.user as any).department = (token as any).department ?? session.user.department ?? null;
+        (session.user as any).phone = (token as any).phone ?? session.user.phone ?? null;
+        (session.user as any).status = (token as any).status ?? session.user.status ?? null;
+        (session.user as any).location_id = (token as any).location_id ?? session.user.location_id ?? null;
+        // expose must_change_password to the client session
+        (session.user as any).must_change_password = Boolean((token as any).must_change_password ?? false);
       }
       return session;
     },
