@@ -7,17 +7,10 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,} from "@/components/ui/dropdown-menu"
 import { ProfileDialog } from "@/components/profile-dialog"
 import { useToast } from "@/hooks/use-toast"
-import {Home, Package, BarChart3, ArrowUpDown, Layers, Settings, Box, Users, Warehouse, Bell, User, LogOut, Loader2} from "lucide-react";
+import {Home, Package, BarChart3, Building2,   Activity, ArrowUpDown, Layers, Settings, Box, Users, Warehouse, Bell, User, LogOut, Loader2} from "lucide-react";
 import {Sidebar,SidebarContent, SidebarGroup,SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, 
   SidebarMenuItem, SidebarHeader, SidebarFooter,} from "@/components/ui/sidebar";
 
@@ -30,54 +23,21 @@ interface SidebarProps {
 }
 
 const items = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "Stock Items",
-    url: "/stocks",
-    icon: Package,
-  },
-  {
-    title: "Stock Movements",
-    url: "/movements",
-    icon: ArrowUpDown,
-  },
-  {
-    title: "Categories",
-    url: "/categories",
-    icon: Layers,
-  },
-  {
-    title: "Locations",
-    url: "/locations",
-    icon: Warehouse,
-  },
-  {
-    title: "Reports",
-    url: "/reports",
-    icon: BarChart3,
-  },
-  {
-    title: "Alerts", // <-- Add Alerts menu item
-    url: "/alerts",
-    icon: Bell,
-  },
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Stock Items", url: "/stocks", icon: Package },
+  { title: "Stock Movements", url: "/movements", icon: ArrowUpDown },
+  { title: "Categories", url: "/categories", icon: Layers },
+  { title: "Locations", url: "/locations", icon: Warehouse },
+  { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Alerts", url: "/alerts", icon: Bell },
+  { title: "Suppliers", url: "/suppliers", icon: Building2 },
+
 ];
 
 const adminItems = [
-  {
-    title: "Users",
-    url: "/users",
-    icon: Users,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
+  { title: "Users", url: "/users", icon: Users },
+  { title: "Activity Logs", url: "/activity-logs", icon: Activity },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -192,16 +152,13 @@ export function AppSidebar({ activeTab, onTabChange }: SidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-
-
       {/* Profile Dialog */}
       <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
 
-      
-        {/* User Profile Section */}
-        <div className="border-t p-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+      {/* User Profile Section */}
+      <div className="border-t p-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start gap-3 h-auto p-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={session.user.image || "/placeholder.svg"} />
