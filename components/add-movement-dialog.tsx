@@ -11,91 +11,135 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent } from "@/components/ui/card"
-import { TrendingUp, TrendingDown, Package, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { TrendingUp, TrendingDown, Package, AlertCircle, Search, Scan } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface StockItem {
-  id: number
+  id: string
   name: string
+  barcode: string
   quantity: number
   unit_price: number
-  location?: string
+  category_name: string
+  subcategory_name: string
+  location_name: string
+  location_code: string
+}
+
+interface Location {
+  id: string
+  name: string
+  code: string
+}
+
+interface User {
+  id: string
+  name: string
+}
+
+interface Supplier {
+  id: string
+  name: string
+  code: string
 }
 
 interface MovementData {
-  item_id: number
-  item_name: string
+  item_id: string
   movement_type: "IN" | "OUT"
   quantity: number
   unit_price?: number
   total_value?: number
-  notes?: string
-  location?: string
-  user_name?: string
   reference_number?: string
-  supplier?: string
+  supplier_id?: string
   customer?: string
+  notes?: string
+  location_id?: string
+  user_id: string
+  received_by?: string
   movement_date: string
 }
 
-interface AddMovementDialogProps {
+interface AddMovementDialogDatabaseProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: Omit<MovementData, "id" | "created_at">) => void
+  onSubmit: (data: MovementData) => void
+  stockItems: StockItem[]
+  locations: Location[]
+  users: User[]
+  suppliers: Supplier[]
 }
 
-export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementDialogProps) {
-  const [items, setItems] = useState<StockItem[]>([])
+export function AddMovementDialogDatabase({
+  open,
+  onOpenChange,
+  onSubmit,
+  stockItems,
+  locations,
+  users,
+  suppliers,
+}: AddMovementDialogDatabaseProps) {
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filteredItems, setFilteredItems] = useState<StockItem[]>([])
   const [formData, setFormData] = useState<Partial<MovementData>>({
     movement_type: "IN",
-    quantity: 0,
+    quantity: 1,
     movement_date: new Date().toISOString().slice(0, 16),
-    location: "Main Warehouse",
-    user_name: "Admin User",
+    user_id: users[0]?.id || "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
     if (open) {
-      fetchItems()
+      // Reset form when dialog opens
+      setFormData({
+        movement_type: "IN",
+        quantity: 1,
+        movement_date: new Date().toISOString().slice(0, 16),
+        user_id: users[0]?.id || "",
+      })
+      setSelectedItem(null)
+      setSearchTerm("")
+      setErrors([])
     }
-  }, [open])
+  }, [open, users])
 
   useEffect(() => {
-    if (selectedItem && formData.quantity && formData.unit_price) {
+    // Filter items based on search term
+    if (searchTerm) {
+      const filtered = stockItems.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.category_name.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+      setFilteredItems(filtered)
+    } else {
+      setFilteredItems(stockItems.slice(0, 10)) // Show first 10 items by default
+    }
+  }, [searchTerm, stockItems])
+
+  useEffect(() => {
+    // Calculate total value when quantity or unit price changes
+    if (formData.quantity && formData.unit_price) {
       setFormData((prev) => ({
         ...prev,
         total_value: formData.quantity! * formData.unit_price!,
       }))
     }
-  }, [selectedItem, formData.quantity, formData.unit_price])
+  }, [formData.quantity, formData.unit_price])
 
-  const fetchItems = async () => {
-    try {
-      const response = await fetch("/api/items")
-      if (response.ok) {
-        const data = await response.json()
-        setItems(data)
-      }
-    } catch (error) {
-      console.error("Error fetching items:", error)
-    }
-  }
-
-  const handleItemSelect = (itemId: string) => {
-    const item = items.find((i) => i.id === Number(itemId))
-    if (item) {
-      setSelectedItem(item)
-      setFormData((prev) => ({
-        ...prev,
-        item_id: item.id,
-        item_name: item.name,
-        unit_price: item.unit_price,
-        location: item.location || prev.location,
-      }))
-    }
+  const handleItemSelect = (item: StockItem) => {
+    setSelectedItem(item)
+    setFormData((prev) => ({
+      ...prev,
+      item_id: item.id,
+      unit_price: item.unit_price,
+      location_id: locations.find((l) => l.name === item.location_name)?.id || prev.location_id,
+    }))
+    setSearchTerm("")
   }
 
   const validateForm = () => {
@@ -103,10 +147,12 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
 
     if (!formData.item_id) newErrors.push("Please select an item")
     if (!formData.quantity || formData.quantity <= 0) newErrors.push("Quantity must be greater than 0")
+    if (!formData.user_id) newErrors.push("Please select a user")
+    if (!formData.movement_date) newErrors.push("Please select a date and time")
+
     if (formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity) {
       newErrors.push(`Cannot remove ${formData.quantity} items. Only ${selectedItem.quantity} available in stock.`)
     }
-    if (!formData.movement_date) newErrors.push("Please select a date and time")
 
     setErrors(newErrors)
     return newErrors.length === 0
@@ -120,26 +166,27 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
     setIsSubmitting(true)
 
     try {
-      await onSubmit(formData as Omit<MovementData, "id" | "created_at">)
-
-      // Reset form
-      setFormData({
-        movement_type: "IN",
-        quantity: 0,
-        movement_date: new Date().toISOString().slice(0, 16),
-        location: "Main Warehouse",
-        user_name: "Admin User",
-      })
-      setSelectedItem(null)
-      setErrors([])
+      await onSubmit(formData as MovementData)
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Error submitting movement:", error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const handleBarcodeSearch = (barcode: string) => {
+    const item = stockItems.find((item) => item.barcode === barcode)
+    if (item) {
+      handleItemSelect(item)
+    } else {
+      setErrors(["Item with barcode not found"])
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Stock Movement</DialogTitle>
         </DialogHeader>
@@ -159,205 +206,329 @@ export function AddMovementDialog({ open, onOpenChange, onSubmit }: AddMovementD
           )}
 
           {/* Item Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="item">Select Item *</Label>
-            <Select value={formData.item_id?.toString() || ""} onValueChange={handleItemSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose an item" />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.id} value={item.id.toString()}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{item.name}</span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        Stock: {item.quantity} | ${item.unit_price}
-                      </span>
+          <div className="space-y-4">
+            <Label>Select Item *</Label>
+
+            {!selectedItem ? (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, barcode, or category..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const barcode = prompt("Enter barcode:")
+                      if (barcode) handleBarcodeSearch(barcode)
+                    }}
+                  >
+                    <Scan className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid gap-2 max-h-60 overflow-y-auto">
+                  {filteredItems.map((item) => (
+                    <Card
+                      key={item.id}
+                      className="cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => handleItemSelect(item)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.category_name} • {item.subcategory_name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {item.barcode}
+                              </Badge>
+                              <Badge variant="secondary">{item.location_code}</Badge>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">Stock: {item.quantity}</div>
+                            <div className="text-sm text-muted-foreground">${item.unit_price}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {filteredItems.length === 0 && searchTerm && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No items found</p>
+                    <p className="text-sm">Try a different search term</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Package className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">{selectedItem.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {selectedItem.category_name} • {selectedItem.subcategory_name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {selectedItem.barcode}
+                          </Badge>
+                          <Badge variant="secondary">{selectedItem.location_code}</Badge>
+                        </div>
+                      </div>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <div className="text-right">
+                      <div className="font-medium">Stock: {selectedItem.quantity}</div>
+                      <div className="text-sm text-muted-foreground">${selectedItem.unit_price}</div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 bg-transparent"
+                    onClick={() => {
+                      setSelectedItem(null)
+                      setFormData((prev) => ({ ...prev, item_id: undefined, unit_price: undefined }))
+                    }}
+                  >
+                    Change Item
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Current Stock Info */}
           {selectedItem && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Package className="h-5 w-5 text-muted-foreground" />
+            <>
+              {/* Movement Type */}
+              <div className="space-y-3">
+                <Label>Movement Type *</Label>
+                <RadioGroup
+                  value={formData.movement_type}
+                  onValueChange={(value: "IN" | "OUT") => setFormData({ ...formData, movement_type: value })}
+                  className="grid grid-cols-2 gap-4"
+                >
                   <div>
-                    <div className="font-medium">{selectedItem.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Current Stock: {selectedItem.quantity} units | Unit Price: ${selectedItem.unit_price}
-                      {selectedItem.location && ` | Location: ${selectedItem.location}`}
-                    </div>
+                    <RadioGroupItem value="IN" id="in" className="peer sr-only" />
+                    <Label
+                      htmlFor="in"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    >
+                      <TrendingUp className="mb-3 h-6 w-6 text-green-600" />
+                      <div className="text-center">
+                        <div className="font-medium">Stock In</div>
+                        <div className="text-sm text-muted-foreground">Add items to inventory</div>
+                      </div>
+                    </Label>
+                  </div>
+                  <div>
+                    <RadioGroupItem value="OUT" id="out" className="peer sr-only" />
+                    <Label
+                      htmlFor="out"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    >
+                      <TrendingDown className="mb-3 h-6 w-6 text-red-600" />
+                      <div className="text-center">
+                        <div className="font-medium">Stock Out</div>
+                        <div className="text-sm text-muted-foreground">Remove items from inventory</div>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Quantity */}
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Quantity *</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="1"
+                    value={formData.quantity || ""}
+                    onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                    placeholder="Enter quantity"
+                  />
+                  {formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity && (
+                    <p className="text-sm text-red-600">
+                      Warning: Exceeds available stock ({selectedItem.quantity} units)
+                    </p>
+                  )}
+                </div>
+
+                {/* Unit Price */}
+                <div className="space-y-2">
+                  <Label htmlFor="unit_price">Unit Price ($)</Label>
+                  <Input
+                    id="unit_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.unit_price || ""}
+                    onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
+                    placeholder="Enter unit price"
+                  />
+                </div>
+              </div>
+
+              {/* Total Value */}
+              {formData.total_value && (
+                <div className="space-y-2">
+                  <Label>Total Value</Label>
+                  <div className="text-2xl font-bold text-green-600">${formData.total_value.toFixed(2)}</div>
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Date & Time */}
+                <div className="space-y-2">
+                  <Label htmlFor="movement_date">Date & Time *</Label>
+                  <Input
+                    id="movement_date"
+                    type="datetime-local"
+                    value={formData.movement_date || ""}
+                    onChange={(e) => setFormData({ ...formData, movement_date: e.target.value })}
+                  />
+                </div>
+
+                {/* Location */}
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location</Label>
+                  <Select
+                    value={formData.location_id || ""}
+                    onValueChange={(value) => setFormData({ ...formData, location_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name} ({location.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* User */}
+                <div className="space-y-2">
+                  <Label htmlFor="user">User *</Label>
+                  <Select
+                    value={formData.user_id || ""}
+                    onValueChange={(value) => setFormData({ ...formData, user_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select user" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Reference Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="reference_number">Reference Number</Label>
+                  <Input
+                    id="reference_number"
+                    value={formData.reference_number || ""}
+                    onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                    placeholder="PO#, Invoice#, etc."
+                  />
+                </div>
+              </div>
+
+              {/* Supplier/Customer */}
+              {formData.movement_type === "IN" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier_id">Supplier</Label>
+                    <Select
+                      value={formData.supplier_id || ""}
+                      onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.name} ({supplier.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="received_by">Received By</Label>
+                    <Select
+                      value={formData.received_by || ""}
+                      onValueChange={(value) => setFormData({ ...formData, received_by: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Movement Type based on items selected */}
-          <div className="space-y-3">
-            <Label>Movement Type *</Label>
-            <RadioGroup
-              value={formData.movement_type}
-              onValueChange={(value: "IN" | "OUT") => setFormData({ ...formData, movement_type: value })}
-              className="grid grid-cols-2 gap-4"
-            >
-              <div>
-                <RadioGroupItem value="IN" id="in" className="peer sr-only" />
-                <Label
-                  htmlFor="in"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                >
-                  <TrendingUp className="mb-3 h-6 w-6 text-green-600" />
-                  <div className="text-center">
-                    <div className="font-medium">Stock In</div>
-                    <div className="text-sm text-muted-foreground">Add items to inventory</div>
-                  </div>
-                </Label>
-              </div>
-              <div>
-                <RadioGroupItem value="OUT" id="out" className="peer sr-only" />
-                <Label
-                  htmlFor="out"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                >
-                  <TrendingDown className="mb-3 h-6 w-6 text-red-600" />
-                  <div className="text-center">
-                    <div className="font-medium">Stock Out</div>
-                    <div className="text-sm text-muted-foreground">Remove items from inventory</div>
-                  </div>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Quantity of Items */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={formData.quantity || ""}
-                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                placeholder="Enter quantity"
-              />
-              {formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity && (
-                <p className="text-sm text-red-600">Warning: Exceeds available stock ({selectedItem.quantity} units)</p>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="customer">Customer/Department</Label>
+                  <Input
+                    id="customer"
+                    value={formData.customer || ""}
+                    onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                    placeholder="Customer or department name"
+                  />
+                </div>
               )}
-            </div>
 
-            {/* Unit Price per items */}
-            <div className="space-y-2">
-              <Label htmlFor="unit_price">Unit Price ($)</Label>
-              <Input
-                id="unit_price"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.unit_price || ""}
-                onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
-                placeholder="Enter unit price"
-              />
-            </div>
-          </div>
-
-          {/* Total Value of items*/}
-          {formData.total_value && (
-            <div className="space-y-2">
-              <Label>Total Value</Label>
-              <div className="text-2xl font-bold text-green-600">${formData.total_value.toFixed(2)}</div>
-            </div>
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes || ""}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes about this movement"
+                  rows={3}
+                />
+              </div>
+            </>
           )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Date & Time */}
-            <div className="space-y-2">
-              <Label htmlFor="movement_date">Date & Time *</Label>
-              <Input
-                id="movement_date"
-                type="datetime-local"
-                value={formData.movement_date || ""}
-                onChange={(e) => setFormData({ ...formData, movement_date: e.target.value })}
-              />
-            </div>
-
-            {/* Location */}
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Select
-                value={formData.location || ""}
-                onValueChange={(value) => setFormData({ ...formData, location: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Main Warehouse">Main Warehouse</SelectItem>
-                  <SelectItem value="Store A">Store A</SelectItem>
-                  <SelectItem value="Store B">Store B</SelectItem>
-                  <SelectItem value="Distribution Center">Distribution Center</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Reference Number */}
-          <div className="space-y-2">
-            <Label htmlFor="reference_number">Reference Number</Label>
-            <Input
-              id="reference_number"
-              value={formData.reference_number || ""}
-              onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-              placeholder="PO#, Invoice#, etc."
-            />
-          </div>
-
-          {/* Supplier/Customer */}
-          {formData.movement_type === "IN" ? (
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Supplier</Label>
-              <Input
-                id="supplier"
-                value={formData.supplier || ""}
-                onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                placeholder="Supplier name"
-              />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="customer">Customer/Department</Label>
-              <Input
-                id="customer"
-                value={formData.customer || ""}
-                onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                placeholder="Customer or department name"
-              />
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes || ""}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Additional notes about this movement"
-              rows={3}
-            />
-          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !selectedItem}>
               {isSubmitting ? "Recording..." : "Record Movement"}
             </Button>
           </div>
