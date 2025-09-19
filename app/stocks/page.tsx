@@ -5,25 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Package,
-  Plus,
-  Search,
-  MapPin,
-  Tag,
-  BarChart3,
-  Loader2,
-  QrCode,
-  Scan,
-  Filter,
-  Eye,
-  Edit,
-  Trash2,
-  DollarSign,
-  AlertTriangle,
-} from "lucide-react"
+import { Package, Plus, Search, MapPin, Tag, BarChart3, Loader2, QrCode, Scan, Filter, Eye, Edit, Trash2, DollarSign, AlertTriangle,} from "lucide-react"
 import { AddStockItemDialogDatabase } from "@/components/add-stock-item-dialog-database"
 import { CategoryManagementDatabase } from "@/components/category-management-database"
 import { BarcodeScanner } from "@/components/barcode-scanner"
@@ -32,24 +17,10 @@ import { ItemLookupResult } from "@/components/item-lookup-result"
 import { ItemNotFound } from "@/components/item-not-found"
 
 export interface StockItem {
-  id: string
-  name: string
-  description?: string
-  quantity: number
-  unit_price: number
-  min_quantity: number
-  status: "in_stock" | "low_stock" | "out_of_stock"
-  barcode: string
-  category_id: string
-  subcategory_id: string
-  location_id: string
-  category_name: string
-  subcategory_name: string
-  location_name: string
-  location_code: string
-  created_by_name: string
-  created_at: string
-  updated_at: string
+  id: string, name: string,  description?: string, quantity: number, unit_price: number,  min_quantity: number,  
+  status: "in_stock" | "low_stock" | "out_of_stock", barcode: string, category_id: string, subcategory_id: string, 
+  location_id: string, category_name: string, subcategory_name: string, location_name: string, location_code: string, created_by_name: string
+  created_at: string, updated_at: string
 }
 
 export interface Category {
@@ -70,6 +41,13 @@ export interface Location {
   current_items: number
 }
 
+
+interface Supplier {
+  id: string
+  name: string
+  code: string
+}
+
 interface ItemFilters {
   search: string
   category: string
@@ -84,6 +62,12 @@ export default function InventoryPageDatabase() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  
+  const [searchTerm, setSearchTerm] = useState("")
+  const [locationFilter, setLocationFilter] = useState<string>("all")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
 
   // Filters (following the layout/setup of the first file)
   const [filters, setFilters] = useState<ItemFilters>({
@@ -174,6 +158,19 @@ export default function InventoryPageDatabase() {
       if (response.ok) setLocations(await response.json())
     } catch (error) {
       console.error(error)
+    }
+  }
+
+
+  const fetchSuppliers = async () => {
+    try {
+      const response = await fetch("/api/suppliers")
+      if (response.ok) {
+        const data = await response.json()
+        setSuppliers(data.suppliers || data)
+      }
+    } catch (error) {
+      console.error("Error fetching suppliers:", error)
     }
   }
 
@@ -991,7 +988,7 @@ export default function InventoryPageDatabase() {
       </Tabs>
 
       {/* Dialogs & Barcode Components (unchanged) */}
-      <AddStockItemDialogDatabase open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onSubmit={handleAddItem} categories={categories} locations={locations} />
+      <AddStockItemDialogDatabase open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onSubmit={handleAddItem} categories={categories} locations={locations} suppliers={suppliers} />
 
       <BarcodeScanner
         open={isScannerOpen}
