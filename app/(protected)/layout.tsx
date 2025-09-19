@@ -1,28 +1,33 @@
-import type React from "react"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { TopNav } from "@/components/top-nav"
-import { AppSidebar } from "@/components/app-sidebar"
+// app/(protected)/layout.tsx
+import type React from "react";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import RequirePasswordChangeRedirect from "./RequirePasswordChangeRedirect"
 
-export default async function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const session = await getServerSession(authOptions)
+/**
+ * Protected route-group layout.
+ *
+ * IMPORTANT:
+ * - This file must live at app/(protected)/layout.tsx
+ * - It does NOT render AppSidebar/TopNav or providers — RootLayout already does that.
+ * - Its only purpose is to enforce server-side auth for the (protected) route group.
+ */
+
+export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect("/login")
+    // Redirect unauthenticated users to the login page
+    redirect("/login");
   }
 
+  // If authenticated, simply render the children.
+  // RootLayout provides the global layout (sidebar, topnav, main wrapper).
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <AppSidebar />
-      <div className="flex flex-col">
-        <TopNav />
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">{children}</main>
-      </div>
-    </div>
-  )
+    <>
+      <RequirePasswordChangeRedirect />
+      {children}
+    </>
+  );
 }
