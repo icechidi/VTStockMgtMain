@@ -20,6 +20,7 @@ interface StockItemData {
   location_id?: string
   category_id?: string
   subcategory_id?: string
+  supplier_id?: string
   barcode?: string
 }
 
@@ -42,12 +43,19 @@ interface Location {
   code: string
 }
 
-interface AddStockItemDialogProps {
+interface Supplier {
+  id: string
+  name: string
+  code: string
+}
+
+interface AddStockItemDialogDatabaseProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: StockItemData) => void
   categories: Category[]
   locations: Location[]
+  suppliers: Supplier[]
 }
 
 export function AddStockItemDialogDatabase({
@@ -56,7 +64,8 @@ export function AddStockItemDialogDatabase({
   onSubmit,
   categories,
   locations,
-}: AddStockItemDialogProps) {
+  suppliers,
+}: AddStockItemDialogDatabaseProps) {
   const [formData, setFormData] = useState<StockItemData>({
     name: "",
     description: "",
@@ -66,6 +75,7 @@ export function AddStockItemDialogDatabase({
     location_id: "",
     category_id: "",
     subcategory_id: "",
+    supplier_id: "",
     barcode: "",
   })
   const [selectedCategory, setSelectedCategory] = useState("")
@@ -146,6 +156,7 @@ export function AddStockItemDialogDatabase({
         location_id: "",
         category_id: "",
         subcategory_id: "",
+        supplier_id: "",
         barcode: "",
       })
       setSelectedCategory("")
@@ -303,6 +314,25 @@ export function AddStockItemDialogDatabase({
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name} ({location.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="supplier">Supplier</Label>
+              <Select
+                value={formData.supplier_id}
+                onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name} ({supplier.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
