@@ -44,12 +44,16 @@ export async function GET(request: NextRequest) {
              sc.name as subcategory_name,
              l.name as location_name,
              l.code as location_code,
-             u.name as created_by_name
+             u.name as created_by_name,
+             s.name as supplier_name,
+             s.code as supplier_code
       FROM stock_items si
       LEFT JOIN categories c ON si.category_id = c.id
       LEFT JOIN subcategories sc ON si.subcategory_id = sc.id
       LEFT JOIN locations l ON si.location_id = l.id
       LEFT JOIN users u ON si.created_by = u.id
+      LEFT JOIN suppliers s ON si.supplier_id = s.id
+
       ${whereClause}
       ORDER BY si.name
     `,
@@ -75,6 +79,7 @@ export async function POST(request: NextRequest) {
       category_id,
       subcategory_id,
       location_id,
+      supplier_id,
       created_by,
     } = await request.json()
 
@@ -87,8 +92,9 @@ export async function POST(request: NextRequest) {
 
     const result = await query(
       `
-      INSERT INTO stock_items (name, description, barcode, quantity, unit_price, min_quantity, category_id, subcategory_id, location_id, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      INSERT INTO stock_items (name, description, barcode, quantity, 
+      unit_price, min_quantity, category_id, subcategory_id, location_id, supplier_id, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `,
       [
@@ -101,6 +107,7 @@ export async function POST(request: NextRequest) {
         category_id,
         subcategory_id,
         location_id,
+        supplier_id,
         created_by,
       ],
     )
