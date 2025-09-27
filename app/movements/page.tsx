@@ -10,22 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Plus,
-  Search,
-  Filter,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
-  CalendarIcon,
-  ArrowUpDown,
-  TrendingUp,
-  TrendingDown,
-  Package,
-  Clock,
-  MapPin,
-} from "lucide-react"
+import { Plus, Search, Filter, Download, Eye, Edit, Trash2, CalendarIcon, ArrowUpDown, TrendingUp,
+         TrendingDown, Package, Clock, MapPin, } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { AddMovementDialog } from "@/components/add-movement-dialog"
@@ -62,14 +48,34 @@ interface MovementFilters {
   sortOrder: "asc" | "desc"
 }
 
+// Define MovementData type based on the fields used in handleAddMovement
+interface MovementData {
+  id: number
+  item_id: number
+  item_name: string
+  movement_type: "IN" | "OUT"
+  quantity: number
+  unit_price?: number
+  total_value?: number
+  notes?: string
+  location?: string
+  user_name?: string
+  reference_number?: string
+  supplier?: string
+  customer?: string
+  movement_date: string
+  created_at?: string
+}
+
 export default function MovementsPage() {
-  const [movements, setMovements] = useState<StockMovement[]>([])
-  const [filteredMovements, setFilteredMovements] = useState<StockMovement[]>([])
+  const [movements, setMovements] = useState<MovementData[]>([])
+  const [filteredMovements, setFilteredMovements] = useState<MovementData[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null)
+  const [selectedMovement, setSelectedMovement] = useState<MovementData | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [viewMode, setViewMode] = useState<"table" | "cards">("table")
@@ -86,8 +92,21 @@ export default function MovementsPage() {
   })
 
   useEffect(() => {
+    const fetchMovements = async () => {
+      try {
+        const res = await fetch("/api/movements")
+        if (!res.ok) throw new Error("Failed to fetch movements")
+        const data: MovementData[] = await res.json()
+        setMovements(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error fetching movements")
+      } finally {
+        setLoading(false)
+      }
+    }
     fetchMovements()
   }, [])
+
 
   useEffect(() => {
     applyFilters()
@@ -166,14 +185,31 @@ export default function MovementsPage() {
     setCurrentPage(1)
   }
 
-  const handleAddMovement = async (movementData: Omit<StockMovement, "id" | "created_at">) => {
+  const handleAddMovement = async (data: Omit<MovementData, "id" | "created_at">) => {
+    // Transform MovementData to the payload expected by your API (Omit<StockMovement, "id" | "created_at">)
+    const movementPayload = {
+      item_id: data.item_id,
+      item_name: data.item_name, // If MovementData doesn't have item_name, you may need to fetch it from stockItems
+      movement_type: data.movement_type,
+      quantity: data.quantity,
+      unit_price: data.unit_price,
+      total_value: data.total_value,
+      notes: data.notes,
+      location: data.location,
+      user_name: data.user_name,
+      reference_number: data.reference_number,
+      supplier: data.supplier,
+      customer: data.customer,
+      movement_date: data.movement_date,
+    }
+  
     try {
       const response = await fetch("/api/movements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(movementData),
+        body: JSON.stringify(movementPayload),
       })
-
+  
       if (response.ok) {
         const newMovement = await response.json()
         setMovements([newMovement, ...movements])
@@ -330,7 +366,9 @@ export default function MovementsPage() {
       </div>
     )
   }
+  if (error) return <p className="text-red-500">{error}</p>
 
+  
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -801,13 +839,19 @@ export default function MovementsPage() {
           <MovementDetailsDialog
             open={showDetailsDialog}
             onOpenChange={setShowDetailsDialog}
-            movement={selectedMovement}
+            movement={{
+              ...selectedMovement,
+              created_at: selectedMovement.created_at ?? "",
+            }}
           />
 
           <EditMovementDialog
             open={showEditDialog}
             onOpenChange={setShowEditDialog}
-            movement={selectedMovement}
+            movement={{
+              ...selectedMovement,
+              created_at: selectedMovement.created_at ?? "",
+            }}
             onSubmit={(data) => handleEditMovement(selectedMovement.id, data)}
           />
         </>
