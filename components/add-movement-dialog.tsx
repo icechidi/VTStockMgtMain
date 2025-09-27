@@ -63,7 +63,7 @@ interface MovementData {
 interface AddMovementDialogDatabaseProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: MovementData) => void
+  onSubmit: (data: Omit<MovementData, "id" | "created_at">) => void
   stockItems: StockItem[]
   locations: Location[]
   users: User[]
@@ -184,6 +184,7 @@ export function AddMovementDialogDatabase({
     }
   }
 
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -537,3 +538,8 @@ export function AddMovementDialogDatabase({
     </Dialog>
   )
 }
+
+// --- Option A compatibility exports ---
+// Provide the symbol your pages import (named) and a default export
+export const AddMovementDialog = AddMovementDialogDatabase
+export default AddMovementDialogDatabase
