@@ -14,7 +14,7 @@ import { Plus, Search, Filter, Download, Eye, Edit, Trash2, CalendarIcon, ArrowU
          TrendingDown, Package, Clock, MapPin, } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { AddMovementDialog } from "@/components/add-movement-dialog"
+import AddMovementDialog from "@/components/add-movement-dialog"
 import { MovementDetailsDialog } from "@/components/movement-details-dialog"
 import { EditMovementDialog } from "@/components/edit-movement-dialog"
 import { MovementStats } from "@/components/movement-stats"
@@ -48,34 +48,61 @@ interface MovementFilters {
   sortOrder: "asc" | "desc"
 }
 
-// Define MovementData type based on the fields used in handleAddMovement
-interface MovementData {
-  id: number
-  item_id: number
-  item_name: string
+// Types used by AddMovementDialog (create payload)
+interface MovementCreate {
+  item_id: string
   movement_type: "IN" | "OUT"
   quantity: number
   unit_price?: number
   total_value?: number
-  notes?: string
-  location?: string
-  user_name?: string
   reference_number?: string
-  supplier?: string
+  supplier_id?: string
   customer?: string
+  notes?: string
+  location_id?: string
+  user_id: string
+  received_by?: string
   movement_date: string
-  created_at?: string
+}
+
+interface StockItem {
+  id: string
+  name: string
+  barcode: string
+  quantity: number
+  unit_price: number
+  category_name: string
+  subcategory_name: string
+  location_name: string
+  location_code: string
+}
+
+interface Location {
+  id: string
+  name: string
+  code: string
+}
+
+interface User {
+  id: string
+  name: string
+}
+
+interface Supplier {
+  id: string
+  name: string
+  code: string
 }
 
 export default function MovementsPage() {
-  const [movements, setMovements] = useState<MovementData[]>([])
-  const [filteredMovements, setFilteredMovements] = useState<MovementData[]>([])
+  const [movements, setMovements] = useState<StockMovement[]>([])
+  const [filteredMovements, setFilteredMovements] = useState<StockMovement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [selectedMovement, setSelectedMovement] = useState<MovementData | null>(null)
+  const [selectedMovement, setSelectedMovement] = useState<StockMovement | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [viewMode, setViewMode] = useState<"table" | "cards">("table")
@@ -91,45 +118,77 @@ export default function MovementsPage() {
     sortOrder: "desc",
   })
 
+  // Supporting data for AddMovementDialog
+  const [stockItems, setStockItems] = useState<StockItem[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supportLoading, setSupportLoading] = useState(true)
+
   useEffect(() => {
-    const fetchMovements = async () => {
+    // Fetch movements and supporting data in parallel
+    const fetchAll = async () => {
       try {
-        const res = await fetch("/api/movements")
-        if (!res.ok) throw new Error("Failed to fetch movements")
-        const data: MovementData[] = await res.json()
-        setMovements(data)
+        setLoading(true)
+        setSupportLoading(true)
+
+        const [movRes, itemsRes, locRes, usersRes, suppliersRes] = await Promise.allSettled([
+          fetch("/api/movements"),
+          fetch("/api/stock-items"),
+          fetch("/api/locations"),
+          fetch("/api/users"),
+          fetch("/api/suppliers"),
+        ])
+
+        // movements
+        if (movRes.status === "fulfilled") {
+          const r = movRes.value
+          if (r.ok) {
+            const data = await r.json()
+            setMovements(data)
+          } else {
+            console.warn("/api/movements responded with", r.status)
+          }
+        }
+
+        // stock items
+        if (itemsRes.status === "fulfilled") {
+          const r = itemsRes.value
+          if (r.ok) setStockItems(await r.json())
+        }
+
+        // locations
+        if (locRes.status === "fulfilled") {
+          const r = locRes.value
+          if (r.ok) setLocations(await r.json())
+        }
+
+        // users
+        if (usersRes.status === "fulfilled") {
+          const r = usersRes.value
+          if (r.ok) setUsers(await r.json())
+        }
+
+        // suppliers
+        if (suppliersRes.status === "fulfilled") {
+          const r = suppliersRes.value
+          if (r.ok) setSuppliers(await r.json())
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error fetching movements")
+        console.error("Error fetching initial data", err)
+        setError("Failed to load initial data")
       } finally {
         setLoading(false)
+        setSupportLoading(false)
       }
     }
-    fetchMovements()
-  }, [])
 
+    fetchAll()
+  }, [])
 
   useEffect(() => {
     applyFilters()
   }, [movements, filters])
-
-  const fetchMovements = async () => {
-    try {
-      const response = await fetch("/api/movements")
-      if (response.ok) {
-        const data = await response.json()
-        setMovements(data)
-      }
-    } catch (error) {
-      console.error("Error fetching movements:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load stock movements",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const applyFilters = () => {
     let filtered = [...movements]
@@ -185,49 +244,26 @@ export default function MovementsPage() {
     setCurrentPage(1)
   }
 
-  const handleAddMovement = async (data: Omit<MovementData, "id" | "created_at">) => {
-    // Transform MovementData to the payload expected by your API (Omit<StockMovement, "id" | "created_at">)
-    const movementPayload = {
-      item_id: data.item_id,
-      item_name: data.item_name, // If MovementData doesn't have item_name, you may need to fetch it from stockItems
-      movement_type: data.movement_type,
-      quantity: data.quantity,
-      unit_price: data.unit_price,
-      total_value: data.total_value,
-      notes: data.notes,
-      location: data.location,
-      user_name: data.user_name,
-      reference_number: data.reference_number,
-      supplier: data.supplier,
-      customer: data.customer,
-      movement_date: data.movement_date,
-    }
-  
+  // create movement (called by AddMovementDialog)
+  const handleAddMovement = async (movementData: MovementCreate) => {
     try {
       const response = await fetch("/api/movements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(movementPayload),
+        body: JSON.stringify(movementData),
       })
-  
-      if (response.ok) {
-        const newMovement = await response.json()
-        setMovements([newMovement, ...movements])
-        setShowAddDialog(false)
-        toast({
-          title: "Success",
-          description: "Stock movement recorded successfully",
-        })
-      } else {
-        throw new Error("Failed to add movement")
-      }
-    } catch (error) {
-      console.error("Error adding movement:", error)
-      toast({
-        title: "Error",
-        description: "Failed to record stock movement",
-        variant: "destructive",
-      })
+
+      if (!response.ok) throw new Error("Failed to add movement")
+
+      const newMovement = await response.json()
+
+      // Append the new movement if API returns it; otherwise optimistically add a minimal record
+      setMovements((prev) => [newMovement, ...prev])
+      setShowAddDialog(false)
+      toast({ title: "Success", description: "Stock movement recorded successfully" })
+    } catch (err) {
+      console.error("Error adding movement:", err)
+      toast({ title: "Error", description: "Failed to record stock movement", variant: "destructive" })
     }
   }
 
@@ -244,20 +280,13 @@ export default function MovementsPage() {
         setMovements(movements.map((m) => (m.id === id ? updatedMovement : m)))
         setShowEditDialog(false)
         setSelectedMovement(null)
-        toast({
-          title: "Success",
-          description: "Movement updated successfully",
-        })
+        toast({ title: "Success", description: "Movement updated successfully" })
       } else {
         throw new Error("Failed to update movement")
       }
     } catch (error) {
       console.error("Error updating movement:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update movement",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to update movement", variant: "destructive" })
     }
   }
 
@@ -265,26 +294,17 @@ export default function MovementsPage() {
     if (!confirm("Are you sure you want to delete this movement? This action cannot be undone.")) return
 
     try {
-      const response = await fetch(`/api/movements/${id}`, {
-        method: "DELETE",
-      })
+      const response = await fetch(`/api/movements/${id}`, { method: "DELETE" })
 
       if (response.ok) {
         setMovements(movements.filter((m) => m.id !== id))
-        toast({
-          title: "Success",
-          description: "Movement deleted successfully",
-        })
+        toast({ title: "Success", description: "Movement deleted successfully" })
       } else {
         throw new Error("Failed to delete movement")
       }
     } catch (error) {
       console.error("Error deleting movement:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete movement",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to delete movement", variant: "destructive" })
     }
   }
 
@@ -315,15 +335,7 @@ export default function MovementsPage() {
   }
 
   const resetFilters = () => {
-    setFilters({
-      search: "",
-      type: "ALL",
-      location: "ALL",
-      dateFrom: undefined,
-      dateTo: undefined,
-      sortBy: "movement_date",
-      sortOrder: "desc",
-    })
+    setFilters({ search: "", type: "ALL", location: "ALL", dateFrom: undefined, dateTo: undefined, sortBy: "movement_date", sortOrder: "desc" })
   }
 
   // Pagination
@@ -368,7 +380,6 @@ export default function MovementsPage() {
   }
   if (error) return <p className="text-red-500">{error}</p>
 
-  
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -832,7 +843,15 @@ export default function MovementsPage() {
       </Tabs>
 
       {/* Dialogs */}
-      <AddMovementDialog open={showAddDialog} onOpenChange={setShowAddDialog} onSubmit={handleAddMovement} />
+      <AddMovementDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSubmit={handleAddMovement}
+        stockItems={stockItems}
+        locations={locations}
+        users={users}
+        suppliers={suppliers}
+      />
 
       {selectedMovement && (
         <>
