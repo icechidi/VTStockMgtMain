@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,7 +46,7 @@ interface Location {
 interface Supplier {
   id: string
   name: string
-  code: string
+  code?: string
 }
 
 interface AddStockItemDialogDatabaseProps {
@@ -54,8 +54,18 @@ interface AddStockItemDialogDatabaseProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: StockItemData) => void
   categories: Category[]
-  locations: Location[]
-  suppliers: Supplier[]
+  locations: Location[] | any
+  suppliers?: Supplier[] | any
+}
+
+function normalizeArray<T = any>(maybeArray: any): T[] {
+  if (!maybeArray) return []
+  if (Array.isArray(maybeArray)) return maybeArray
+  if (typeof maybeArray === "object" && maybeArray !== null) {
+    if (Array.isArray(maybeArray.rows)) return maybeArray.rows
+    if (Array.isArray(maybeArray.data)) return maybeArray.data
+  }
+  return []
 }
 
 export function AddStockItemDialogDatabase({
@@ -82,6 +92,38 @@ export function AddStockItemDialogDatabase({
   const [selectedSubCategory, setSelectedSubCategory] = useState("")
   const [showTemplates, setShowTemplates] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // normalize incoming props
+  const suppliedSuppliers = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
+  const locationsList = useMemo(() => normalizeArray<Location>(locations), [locations])
+
+  // local suppliers state (initialized from prop). If empty, try to fetch /api/suppliers once.
+  const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(suppliedSuppliers)
+  useEffect(() => setLocalSuppliers(suppliedSuppliers), [suppliedSuppliers])
+
+  useEffect(() => {
+    // if we have no suppliers passed in and localSuppliers is empty, try fetching from API
+    if ((suppliedSuppliers.length === 0) && localSuppliers.length === 0) {
+      let mounted = true
+      const tryFetch = async () => {
+        try {
+          const res = await fetch("/api/suppliers")
+          if (!res.ok) return
+          const data = await res.json()
+          const normalized = normalizeArray<Supplier>(data)
+          if (mounted && normalized.length > 0) setLocalSuppliers(normalized)
+        } catch (err) {
+          // fail silently — parent may not provide endpoint
+          // console.warn("Could not fetch /api/suppliers:", err)
+        }
+      }
+      tryFetch()
+      return () => {
+        mounted = false
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const itemTemplates = [
     {
@@ -136,13 +178,10 @@ export function AddStockItemDialogDatabase({
     setIsSubmitting(true)
 
     try {
-      const selectedCategoryObj = categories.find((c) => c.id === selectedCategory)
-      const selectedSubcategoryObj = selectedCategoryObj?.subcategories.find((s) => s.id === selectedSubCategory)
-
       await onSubmit({
         ...formData,
-        category_id: selectedCategory,
-        subcategory_id: selectedSubCategory,
+        category_id: selectedCategory || undefined,
+        subcategory_id: selectedSubCategory || undefined,
         barcode: formData.barcode || `BC${Date.now().toString().slice(-6)}`,
       })
 
@@ -161,6 +200,7 @@ export function AddStockItemDialogDatabase({
       })
       setSelectedCategory("")
       setSelectedSubCategory("")
+      onOpenChange(false)
     } finally {
       setIsSubmitting(false)
     }
@@ -170,13 +210,13 @@ export function AddStockItemDialogDatabase({
     const category = categories.find((c) => c.name === template.category)
     const subcategory = category?.subcategories.find((s) => s.name === template.subcategory)
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       name: template.name,
       description: template.description,
       unit_price: template.unit_price,
       min_quantity: template.min_quantity,
-    })
+    }))
 
     if (category) {
       setSelectedCategory(category.id)
@@ -311,11 +351,17 @@ export function AddStockItemDialogDatabase({
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name} ({location.code})
+                  {locationsList.length === 0 ? (
+                    <SelectItem value="__no-location" disabled>
+                      No locations available
                     </SelectItem>
-                  ))}
+                  ) : (
+                    locationsList.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name} ({location.code})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -330,11 +376,18 @@ export function AddStockItemDialogDatabase({
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name} ({supplier.code})
+                  {localSuppliers.length === 0 ? (
+                    // sentinel non-empty value, disabled
+                    <SelectItem value="__no-supplier" disabled>
+                      No suppliers available
                     </SelectItem>
-                  ))}
+                  ) : (
+                    localSuppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name} {supplier.code ? `(${supplier.code})` : ""}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -399,3 +452,4 @@ export function AddStockItemDialogDatabase({
     </Dialog>
   )
 }
+export default AddStockItemDialogDatabase
