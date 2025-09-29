@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,9 +65,19 @@ interface AddMovementDialogDatabaseProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: Omit<MovementData, "id" | "created_at">) => void
   stockItems: StockItem[]
-  locations: Location[]
-  users: User[]
-  suppliers: Supplier[]
+  locations: Location[] | any
+  users: User[] | any
+  suppliers: Supplier[] | any
+}
+
+function normalizeArray<T = any>(maybeArray: any): T[] {
+  if (!maybeArray) return []
+  if (Array.isArray(maybeArray)) return maybeArray
+  if (typeof maybeArray === "object") {
+    if (Array.isArray(maybeArray.rows)) return maybeArray.rows
+    if (Array.isArray(maybeArray.data)) return maybeArray.data
+  }
+  return []
 }
 
 export function AddMovementDialogDatabase({
@@ -86,10 +96,15 @@ export function AddMovementDialogDatabase({
     movement_type: "IN",
     quantity: 1,
     movement_date: new Date().toISOString().slice(0, 16),
-    user_id: users[0]?.id || "",
+    user_id: (users && Array.isArray(users) && users[0]?.id) || "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+
+  // Normalize potentially non-array props into arrays
+  const suppliersList = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
+  const usersList = useMemo(() => normalizeArray<User>(users), [users])
+  const locationsList = useMemo(() => normalizeArray<Location>(locations), [locations])
 
   useEffect(() => {
     if (open) {
@@ -98,13 +113,14 @@ export function AddMovementDialogDatabase({
         movement_type: "IN",
         quantity: 1,
         movement_date: new Date().toISOString().slice(0, 16),
-        user_id: users[0]?.id || "",
+        user_id: usersList[0]?.id || "",
       })
       setSelectedItem(null)
       setSearchTerm("")
       setErrors([])
     }
-  }, [open, users])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, usersList])
 
   useEffect(() => {
     // Filter items based on search term
@@ -137,7 +153,7 @@ export function AddMovementDialogDatabase({
       ...prev,
       item_id: item.id,
       unit_price: item.unit_price,
-      location_id: locations.find((l) => l.name === item.location_name)?.id || prev.location_id,
+      location_id: locationsList.find((l) => l.name === item.location_name)?.id || prev.location_id,
     }))
     setSearchTerm("")
   }
@@ -184,7 +200,6 @@ export function AddMovementDialogDatabase({
     }
   }
 
-  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -408,19 +423,20 @@ export function AddMovementDialogDatabase({
                 {/* Location */}
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Select
-                    value={formData.location_id || ""}
-                    onValueChange={(value) => setFormData({ ...formData, location_id: value })}
-                  >
+                  <Select value={formData.location_id || ""} onValueChange={(value) => setFormData({ ...formData, location_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name} ({location.code})
-                        </SelectItem>
-                      ))}
+                      {locationsList.length === 0 ? (
+                        <SelectItem value="">No locations</SelectItem>
+                      ) : (
+                        locationsList.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name} ({location.code})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -430,19 +446,20 @@ export function AddMovementDialogDatabase({
                 {/* User */}
                 <div className="space-y-2">
                   <Label htmlFor="user">User *</Label>
-                  <Select
-                    value={formData.user_id || ""}
-                    onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                  >
+                  <Select value={formData.user_id || ""} onValueChange={(value) => setFormData({ ...formData, user_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select user" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
+                      {usersList.length === 0 ? (
+                        <SelectItem value="">No users</SelectItem>
+                      ) : (
+                        usersList.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -464,37 +481,39 @@ export function AddMovementDialogDatabase({
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="supplier_id">Supplier</Label>
-                    <Select
-                      value={formData.supplier_id || ""}
-                      onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                    >
+                    <Select value={formData.supplier_id || ""} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select supplier" />
                       </SelectTrigger>
                       <SelectContent>
-                        {suppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
-                            {supplier.name} ({supplier.code})
-                          </SelectItem>
-                        ))}
+                        {suppliersList.length === 0 ? (
+                          <SelectItem value="">No suppliers available</SelectItem>
+                        ) : (
+                          suppliersList.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.id}>
+                              {supplier.name} ({supplier.code})
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="received_by">Received By</Label>
-                    <Select
-                      value={formData.received_by || ""}
-                      onValueChange={(value) => setFormData({ ...formData, received_by: value })}
-                    >
+                    <Select value={formData.received_by || ""} onValueChange={(value) => setFormData({ ...formData, received_by: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {usersList.length === 0 ? (
+                          <SelectItem value="">No users</SelectItem>
+                        ) : (
+                          usersList.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
