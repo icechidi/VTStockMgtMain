@@ -1,8 +1,7 @@
+// components/add-stock-item-dialog.tsx
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useMemo } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,17 +23,17 @@ interface StockItemData {
   barcode?: string
 }
 
+interface Subcategory {
+  id: string
+  name: string
+  description?: string
+}
+
 interface Category {
   id: string
   name: string
   description?: string
   subcategories: Subcategory[]
-}
-
-interface Subcategory {
-  id: string
-  name: string
-  description?: string
 }
 
 interface Location {
@@ -44,7 +43,7 @@ interface Location {
 }
 
 interface Supplier {
-  id: string
+  id: string | number
   name: string
   code?: string
 }
@@ -52,18 +51,27 @@ interface Supplier {
 interface AddStockItemDialogDatabaseProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: StockItemData) => void
+  onSubmit: (data: StockItemData) => Promise<void> | void
   categories: Category[]
-  locations: Location[] | any
-  suppliers?: Supplier[] | any
+  locations?: Location[] | { rows?: Location[] } | { data?: Location[] } | any
+  suppliers?: Supplier[] | { suppliers?: Supplier[] } | { rows?: Supplier[] } | { data?: Supplier[] } | any
 }
 
+/**
+ * Normalizes different shapes to a plain array:
+ * - array
+ * - { rows: [...] }
+ * - { data: [...] }
+ * - { suppliers: [...] }
+ */
 function normalizeArray<T = any>(maybeArray: any): T[] {
   if (!maybeArray) return []
   if (Array.isArray(maybeArray)) return maybeArray
   if (typeof maybeArray === "object" && maybeArray !== null) {
     if (Array.isArray(maybeArray.rows)) return maybeArray.rows
     if (Array.isArray(maybeArray.data)) return maybeArray.data
+    if (Array.isArray(maybeArray.suppliers)) return maybeArray.suppliers
+    if (Array.isArray(maybeArray.locations)) return maybeArray.locations
   }
   return []
 }
@@ -88,48 +96,71 @@ export function AddStockItemDialogDatabase({
     supplier_id: "",
     barcode: "",
   })
-  const [selectedCategory, setSelectedCategory] = useState("")
-  const [selectedSubCategory, setSelectedSubCategory] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("")
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>("")
   const [showTemplates, setShowTemplates] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
 
-  // normalize incoming props
-  const suppliedSuppliers = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
   const locationsList = useMemo(() => normalizeArray<Location>(locations), [locations])
+  const suppliedSuppliers = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
 
-  // local suppliers state (initialized from prop). If empty, try to fetch /api/suppliers once.
+  // local suppliers state (init from props). If empty we try a one-time fetch from /api/suppliers
   const [localSuppliers, setLocalSuppliers] = useState<Supplier[]>(suppliedSuppliers)
-  useEffect(() => setLocalSuppliers(suppliedSuppliers), [suppliedSuppliers])
 
   useEffect(() => {
-    // if we have no suppliers passed in and localSuppliers is empty, try fetching from API
-    if ((suppliedSuppliers.length === 0) && localSuppliers.length === 0) {
+    setLocalSuppliers(suppliedSuppliers)
+  }, [suppliedSuppliers])
+
+  useEffect(() => {
+    // If parent didn't provide suppliers, try fetching once when dialog opens
+    if (open && localSuppliers.length === 0) {
       let mounted = true
-      const tryFetch = async () => {
+      ;(async () => {
         try {
           const res = await fetch("/api/suppliers")
           if (!res.ok) return
-          const data = await res.json()
-          const normalized = normalizeArray<Supplier>(data)
+          const json = await res.json()
+          const normalized = normalizeArray<Supplier>(json)
           if (mounted && normalized.length > 0) setLocalSuppliers(normalized)
         } catch (err) {
-          // fail silently — parent may not provide endpoint
-          // console.warn("Could not fetch /api/suppliers:", err)
+          // fail silently — optional endpoint
         }
-      }
-      tryFetch()
+      })()
       return () => {
         mounted = false
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [open])
+
+  // Keep category/subcategory in sync with formData
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, category_id: selectedCategory || undefined }))
+  }, [selectedCategory])
+
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, subcategory_id: selectedSubCategory || undefined }))
+  }, [selectedSubCategory])
+
+  // Set sensible defaults when lists change
+  useEffect(() => {
+    if (locationsList.length > 0 && !formData.location_id) {
+      setFormData((prev) => ({ ...prev, location_id: String(locationsList[0].id) }))
+    }
+  }, [locationsList]) // eslint-disable-line
+
+  useEffect(() => {
+    if (localSuppliers.length > 0 && !formData.supplier_id) {
+      setFormData((prev) => ({ ...prev, supplier_id: String(localSuppliers[0].id) }))
+    }
+  }, [localSuppliers]) // eslint-disable-line
 
   const itemTemplates = [
     {
       id: 1,
       name: "Desktop Computer",
-      description: "Standard office desktop computer with monitor, keyboard, and mouse",
+      description: "Standard office desktop with monitor",
       unit_price: 800,
       min_quantity: 5,
       category: "Hardware",
@@ -147,7 +178,7 @@ export function AddStockItemDialogDatabase({
     {
       id: 3,
       name: 'Monitor 24"',
-      description: "24-inch LED monitor for workstation",
+      description: "24-inch LED monitor",
       unit_price: 250,
       min_quantity: 8,
       category: "Hardware",
@@ -156,36 +187,58 @@ export function AddStockItemDialogDatabase({
     {
       id: 4,
       name: "Wireless Mouse",
-      description: "Ergonomic wireless optical mouse",
+      description: "Ergonomic wireless mouse",
       unit_price: 25,
       min_quantity: 20,
       category: "Accessories",
       subcategory: "Mouse",
     },
-    {
-      id: 5,
-      name: "Mechanical Keyboard",
-      description: "Professional mechanical keyboard",
-      unit_price: 120,
-      min_quantity: 15,
-      category: "Accessories",
-      subcategory: "Keyboard",
-    },
-  ]
+  ] as const
+
+  const handleTemplateSelect = (t: typeof itemTemplates[number]) => {
+    const cat = categories.find((c) => c.name === t.category)
+    const sub = cat?.subcategories.find((s) => s.name === t.subcategory)
+
+    setFormData((prev) => ({
+      ...prev,
+      name: t.name,
+      description: t.description,
+      unit_price: t.unit_price,
+      min_quantity: t.min_quantity,
+    }))
+    if (cat) setSelectedCategory(cat.id)
+    if (sub) setSelectedSubCategory(sub.id)
+    setShowTemplates(false)
+  }
+
+  const validate = () => {
+    const errs: string[] = []
+    if (!formData.name || formData.name.trim() === "") errs.push("Item name is required")
+    if (formData.quantity < 0) errs.push("Quantity cannot be negative")
+    if (formData.unit_price < 0) errs.push("Unit price cannot be negative")
+    setErrors(errs)
+    return errs.length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) return
     setIsSubmitting(true)
 
     try {
-      await onSubmit({
+      const payload: StockItemData = {
         ...formData,
         category_id: selectedCategory || undefined,
         subcategory_id: selectedSubCategory || undefined,
         barcode: formData.barcode || `BC${Date.now().toString().slice(-6)}`,
-      })
+      }
+      // Ensure supplier/location ids are strings or undefined
+      if (payload.supplier_id) payload.supplier_id = String(payload.supplier_id)
+      if (payload.location_id) payload.location_id = String(payload.location_id)
 
-      // Reset form
+      await onSubmit(payload)
+
+      // Reset
       setFormData({
         name: "",
         description: "",
@@ -200,36 +253,14 @@ export function AddStockItemDialogDatabase({
       })
       setSelectedCategory("")
       setSelectedSubCategory("")
+      setErrors([])
       onOpenChange(false)
+    } catch (err) {
+      console.error("Error adding item:", err)
+      setErrors(["Failed to add item. See console for details."])
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const handleTemplateSelect = (template: (typeof itemTemplates)[0]) => {
-    const category = categories.find((c) => c.name === template.category)
-    const subcategory = category?.subcategories.find((s) => s.name === template.subcategory)
-
-    setFormData((prev) => ({
-      ...prev,
-      name: template.name,
-      description: template.description,
-      unit_price: template.unit_price,
-      min_quantity: template.min_quantity,
-    }))
-
-    if (category) {
-      setSelectedCategory(category.id)
-      if (subcategory) {
-        setSelectedSubCategory(subcategory.id)
-      }
-    }
-    setShowTemplates(false)
-  }
-
-  const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value)
-    setSelectedSubCategory("") // reset subcategory when category changes
   }
 
   const selectedCategoryObj = categories.find((c) => c.id === selectedCategory)
@@ -241,41 +272,37 @@ export function AddStockItemDialogDatabase({
           <DialogTitle>Add New Stock Item</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 px-2">
           <div>
-            <Button type="button" variant="outline" onClick={() => setShowTemplates(!showTemplates)} className="mb-4">
+            <Button type="button" variant="outline" onClick={() => setShowTemplates((s) => !s)} className="mb-4">
               {showTemplates ? "Hide" : "Show"} Item Templates
             </Button>
 
             {showTemplates && (
-              <Card>
+              <Card className="mb-4">
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Add Templates</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 max-h-60 overflow-y-auto">
-                    {itemTemplates.map((template) => (
+                    {itemTemplates.map((t) => (
                       <div
-                        key={template.id}
+                        key={t.id}
                         className="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => handleTemplateSelect(template)}
+                        onClick={() => handleTemplateSelect(t)}
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h4 className="font-medium">{template.name}</h4>
-                            <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
+                            <h4 className="font-medium">{t.name}</h4>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{t.description}</p>
                             <div className="flex gap-2 mt-1">
-                              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                                {template.category}
-                              </span>
-                              <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded">
-                                {template.subcategory}
-                              </span>
+                              <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800">{t.category}</span>
+                              <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800">{t.subcategory}</span>
                             </div>
                           </div>
                           <div className="text-right ml-4">
-                            <div className="font-medium">${template.unit_price}</div>
-                            <div className="text-xs text-muted-foreground">Min: {template.min_quantity}</div>
+                            <div className="font-medium">${t.unit_price}</div>
+                            <div className="text-xs text-muted-foreground">Min: {t.min_quantity}</div>
                           </div>
                         </div>
                       </div>
@@ -287,16 +314,22 @@ export function AddStockItemDialogDatabase({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {errors.length > 0 && (
+              <div className="rounded bg-red-50 border border-red-200 p-2 text-sm text-red-700">
+                <ul className="list-disc list-inside">
+                  {errors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Item Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+                <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="barcode">Barcode</Label>
                 <Input
@@ -311,29 +344,31 @@ export function AddStockItemDialogDatabase({
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+                <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
+                    {categories.map((c) => (
+                      // c.id must be non-empty; assume categories are valid
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="subcategory">Subcategory</Label>
-                <Select value={selectedSubCategory} onValueChange={setSelectedSubCategory} disabled={!selectedCategory}>
+                <Select value={selectedSubCategory} onValueChange={(v) => setSelectedSubCategory(v)} disabled={!selectedCategory}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select subcategory" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedCategoryObj?.subcategories.map((subcategory) => (
-                      <SelectItem key={subcategory.id} value={subcategory.id}>
-                        {subcategory.name}
+                    {(selectedCategoryObj?.subcategories || []).map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -344,8 +379,8 @@ export function AddStockItemDialogDatabase({
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Select
-                value={formData.location_id}
-                onValueChange={(value) => setFormData({ ...formData, location_id: value })}
+                value={formData.location_id || "__no-location"}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, location_id: value === "__no-location" ? "" : String(value) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select location" />
@@ -356,9 +391,9 @@ export function AddStockItemDialogDatabase({
                       No locations available
                     </SelectItem>
                   ) : (
-                    locationsList.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name} ({location.code})
+                    locationsList.map((loc) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>
+                        {loc.name} ({loc.code})
                       </SelectItem>
                     ))
                   )}
@@ -369,22 +404,21 @@ export function AddStockItemDialogDatabase({
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier</Label>
               <Select
-                value={formData.supplier_id}
-                onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                value={formData.supplier_id || "__no-supplier"}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, supplier_id: value === "__no-supplier" ? "" : String(value) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
                   {localSuppliers.length === 0 ? (
-                    // sentinel non-empty value, disabled
                     <SelectItem value="__no-supplier" disabled>
                       No suppliers available
                     </SelectItem>
                   ) : (
-                    localSuppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name} {supplier.code ? `(${supplier.code})` : ""}
+                    localSuppliers.map((s) => (
+                      <SelectItem key={String(s.id)} value={String(s.id)}>
+                        {s.name} {s.code ? `(${s.code})` : ""}
                       </SelectItem>
                     ))
                   )}
@@ -394,47 +428,23 @@ export function AddStockItemDialogDatabase({
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
+              <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Initial Quantity *</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="0"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                  required
-                />
+                <Input id="quantity" type="number" min={0} value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })} required />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="unit_price">Unit Price ($) *</Label>
-                <Input
-                  id="unit_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.unit_price}
-                  onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })}
-                  required
-                />
+                <Input id="unit_price" type="number" min={0} step="0.01" value={formData.unit_price} onChange={(e) => setFormData({ ...formData, unit_price: Number(e.target.value) })} required />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="min_quantity">Minimum Quantity</Label>
-                <Input
-                  id="min_quantity"
-                  type="number"
-                  min="0"
-                  value={formData.min_quantity}
-                  onChange={(e) => setFormData({ ...formData, min_quantity: Number(e.target.value) })}
-                />
+                <Input id="min_quantity" type="number" min={0} value={formData.min_quantity} onChange={(e) => setFormData({ ...formData, min_quantity: Number(e.target.value) })} />
               </div>
             </div>
 
@@ -452,4 +462,5 @@ export function AddStockItemDialogDatabase({
     </Dialog>
   )
 }
+
 export default AddStockItemDialogDatabase
