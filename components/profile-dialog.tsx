@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,20 +21,33 @@ interface ProfileDialogProps {
 }
 
 export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
+  const router = useRouter()
   const { data: session, update } = useSession()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // local preview url for avatar (created from the selected file)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarLoading, setAvatarLoading] = useState(false)
+
+  useEffect(() => {
+    // when dialog closes, cleanup preview
+    if (!open && avatarPreview) {
+      URL.revokeObjectURL(avatarPreview)
+      setAvatarPreview(null)
+    }
+  }, [open, avatarPreview])
 
   // Profile form state
   const [profileData, setProfileData] = useState({
     name: session?.user?.name || "",
     email: session?.user?.email || "",
-    phone: session?.user?.phone || "",
-    department: session?.user?.department || "",
+    phone: (session as any)?.user?.phone || "",
+    department: (session as any)?.user?.department || "",
   })
   const [profileLoading, setProfileLoading] = useState(false)
 
-  // Password form state
+  // Password form state (unchanged)
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -43,8 +56,15 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordError, setPasswordError] = useState("")
 
-  // Avatar upload state
-  const [avatarLoading, setAvatarLoading] = useState(false)
+  useEffect(() => {
+    // keep profile fields in sync when session updates
+    setProfileData({
+      name: session?.user?.name || "",
+      email: session?.user?.email || "",
+      phone: (session as any)?.user?.phone || "",
+      department: (session as any)?.user?.department || "",
+    })
+  }, [session?.user])
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,7 +81,8 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
       if (response.ok) {
         const updatedUser = await response.json()
-        await update({
+        // update next-auth session - call update() the way next-auth expects
+        await update?.({
           ...session,
           user: {
             ...session?.user,
@@ -163,6 +184,13 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       return
     }
 
+    // // show local preview immediately
+    // if (avatarPreview) {
+    //   URL.revokeObjectURL(avatarPreview)
+    // }
+    // const url = URL.createObjectURL(file)
+    // setAvatarPreview(url)
+
     setAvatarLoading(true)
 
     try {
@@ -174,38 +202,60 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
         body: formData,
       })
 
-      if (response.ok) {
-        const { imageUrl } = await response.json()
-        await update({
-          ...session,
-          user: {
-            ...session?.user,
-            image: imageUrl,
-          },
-        })
-        toast({
-          title: "Avatar updated",
-          description: "Your profile picture has been updated successfully.",
-        })
-      } else {
-        toast({
-          title: "Upload failed",
-          description: "Failed to upload avatar. Please try again.",
-          variant: "destructive",
-        })
+
+      if (!response.ok) {
+        toast({ title: "Upload failed", description: "Failed to upload avatar. Please try again.", variant: "destructive" })
+        return
       }
+
+      const data = await response.json()
+      const imageUrl = data.imageUrl || data.url || data.path
+
+      if (!imageUrl) {
+        toast({ title: "Upload failed", description: "Server didn't return image URL.", variant: "destructive" })
+        return
+      }
+
+      // set local preview so UI updates instantly
+      setAvatarPreview(imageUrl)
+
+      // try to update client session if available
+      try {
+        if (update) {
+          // update session user object locally
+          await update({
+            ...session,
+            user: {
+              ...session?.user,
+              image: imageUrl,
+            },
+          })
+        }
+      } catch (err) {
+        // not critical — we'll still refresh below
+        console.warn("session update failed", err)
+      }
+
+      // Refresh pages / server components so server-side data and Navbars re-render
+      try {
+        router.refresh()
+      } catch (err) {
+        // fallback to full reload if router.refresh isn't effective (rare)
+        // window.location.reload()
+      }
+
+      toast({ title: "Avatar updated", description: "Your profile picture has been updated successfully." })
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: "An error occurred while uploading your avatar.",
-        variant: "destructive",
-      })
+      console.error("Avatar upload error:", error)
+      toast({ title: "Upload failed", description: "An error occurred while uploading your avatar.", variant: "destructive" })
     } finally {
       setAvatarLoading(false)
     }
   }
 
   if (!session?.user) return null
+
+  const displayImage = avatarPreview ?? (session.user.image || "/placeholder.svg")
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,15 +286,15 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
               <CardContent className="space-y-4">
                 {/* Avatar Upload */}
                 <div className="flex items-center space-x-4">
-                  <Avatar className="w-20 h-20">
-                    <AvatarImage src={session.user.image || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {session.user.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("") || "U"}
-                    </AvatarFallback>
-                  </Avatar>
+                    <Avatar className="w-20 h-20">
+                      <AvatarImage src={avatarPreview ?? session.user.image ?? "/placeholder.svg"} />
+                      <AvatarFallback>
+                        {session.user.name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("") || "U"}
+                      </AvatarFallback>
+                    </Avatar>
                   <div>
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={avatarLoading}>
                       {avatarLoading ? (
