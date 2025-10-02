@@ -1,8 +1,7 @@
+// components/add-movement-dialog.tsx
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useMemo } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,7 +40,7 @@ interface User {
 interface Supplier {
   id: string
   name: string
-  code: string
+  code?: string
 }
 
 interface MovementData {
@@ -63,19 +62,21 @@ interface MovementData {
 interface AddMovementDialogDatabaseProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: Omit<MovementData, "id" | "created_at">) => void
-  stockItems: StockItem[]
-  locations: Location[] | any
-  users: User[] | any
-  suppliers: Supplier[] | any
+  onSubmit: (data: Omit<MovementData, "id" | "created_at">) => void | Promise<void>
+  stockItems?: StockItem[] | any
+  locations?: Location[] | any
+  users?: User[] | any
+  suppliers?: Supplier[] | any
 }
 
+/** normalize helper - handles arrays or objects with rows/data */
 function normalizeArray<T = any>(maybeArray: any): T[] {
   if (!maybeArray) return []
   if (Array.isArray(maybeArray)) return maybeArray
-  if (typeof maybeArray === "object") {
+  if (typeof maybeArray === "object" && maybeArray !== null) {
     if (Array.isArray(maybeArray.rows)) return maybeArray.rows
     if (Array.isArray(maybeArray.data)) return maybeArray.data
+    if (Array.isArray(maybeArray.items)) return maybeArray.items
   }
   return []
 }
@@ -89,22 +90,53 @@ export function AddMovementDialogDatabase({
   users,
   suppliers,
 }: AddMovementDialogDatabaseProps) {
+  // normalize incoming props
+  const stockItemsList = useMemo(() => normalizeArray<StockItem>(stockItems), [stockItems])
+  const locationsList = useMemo(() => normalizeArray<Location>(locations), [locations])
+  const usersList = useMemo(() => normalizeArray<User>(users), [users])
+  const suppliersList = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
+
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filteredItems, setFilteredItems] = useState<StockItem[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+
+  // sentinel values for selects when nothing is available
+  const NO_SUPPLIER = "__no-supplier"
+  const NO_LOCATION = "__no-location"
+  const NO_USER = "__no-user"
+  const NO_RECEIVED_BY = "__no-received"
+
   const [formData, setFormData] = useState<Partial<MovementData>>({
     movement_type: "IN",
     quantity: 1,
     movement_date: new Date().toISOString().slice(0, 16),
-    user_id: (users && Array.isArray(users) && users[0]?.id) || "",
+    user_id: usersList[0]?.id ? String(usersList[0].id) : NO_USER,
+    location_id: locationsList[0]?.id ? String(locationsList[0].id) : NO_LOCATION,
+    supplier_id: suppliersList[0]?.id ? String(suppliersList[0].id) : NO_SUPPLIER,
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errors, setErrors] = useState<string[]>([])
 
-  // Normalize potentially non-array props into arrays
-  const suppliersList = useMemo(() => normalizeArray<Supplier>(suppliers), [suppliers])
-  const usersList = useMemo(() => normalizeArray<User>(users), [users])
-  const locationsList = useMemo(() => normalizeArray<Location>(locations), [locations])
+  // keep defaults in sync when props change
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      user_id: prev.user_id && prev.user_id !== NO_USER ? prev.user_id : usersList[0]?.id ? String(usersList[0].id) : NO_USER,
+      location_id:
+        prev.location_id && prev.location_id !== NO_LOCATION
+          ? prev.location_id
+          : locationsList[0]?.id
+          ? String(locationsList[0].id)
+          : NO_LOCATION,
+      supplier_id:
+        prev.supplier_id && prev.supplier_id !== NO_SUPPLIER
+          ? prev.supplier_id
+          : suppliersList[0]?.id
+          ? String(suppliersList[0].id)
+          : NO_SUPPLIER,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usersList.length, locationsList.length, suppliersList.length])
 
   useEffect(() => {
     if (open) {
@@ -113,19 +145,21 @@ export function AddMovementDialogDatabase({
         movement_type: "IN",
         quantity: 1,
         movement_date: new Date().toISOString().slice(0, 16),
-        user_id: usersList[0]?.id || "",
+        user_id: usersList[0]?.id ? String(usersList[0].id) : NO_USER,
+        location_id: locationsList[0]?.id ? String(locationsList[0].id) : NO_LOCATION,
+        supplier_id: suppliersList[0]?.id ? String(suppliersList[0].id) : NO_SUPPLIER,
       })
       setSelectedItem(null)
       setSearchTerm("")
       setErrors([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, usersList])
+  }, [open])
 
   useEffect(() => {
     // Filter items based on search term
     if (searchTerm) {
-      const filtered = stockItems.filter(
+      const filtered = stockItemsList.filter(
         (item) =>
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,16 +167,16 @@ export function AddMovementDialogDatabase({
       )
       setFilteredItems(filtered)
     } else {
-      setFilteredItems(stockItems.slice(0, 10)) // Show first 10 items by default
+      setFilteredItems(stockItemsList.slice(0, 10)) // Show first 10 items by default
     }
-  }, [searchTerm, stockItems])
+  }, [searchTerm, stockItemsList])
 
   useEffect(() => {
     // Calculate total value when quantity or unit price changes
-    if (formData.quantity && formData.unit_price) {
+    if (formData.quantity !== undefined && formData.unit_price !== undefined && !Number.isNaN(Number(formData.quantity)) && !Number.isNaN(Number(formData.unit_price))) {
       setFormData((prev) => ({
         ...prev,
-        total_value: formData.quantity! * formData.unit_price!,
+        total_value: Number(prev.quantity || 0) * Number(prev.unit_price || 0),
       }))
     }
   }, [formData.quantity, formData.unit_price])
@@ -153,7 +187,9 @@ export function AddMovementDialogDatabase({
       ...prev,
       item_id: item.id,
       unit_price: item.unit_price,
-      location_id: locationsList.find((l) => l.name === item.location_name)?.id || prev.location_id,
+      location_id: locationsList.find((l) => l.name === item.location_name)?.id
+        ? String(locationsList.find((l) => l.name === item.location_name)!.id)
+        : prev.location_id,
     }))
     setSearchTerm("")
   }
@@ -162,8 +198,8 @@ export function AddMovementDialogDatabase({
     const newErrors: string[] = []
 
     if (!formData.item_id) newErrors.push("Please select an item")
-    if (!formData.quantity || formData.quantity <= 0) newErrors.push("Quantity must be greater than 0")
-    if (!formData.user_id) newErrors.push("Please select a user")
+    if (!formData.quantity || Number(formData.quantity) <= 0) newErrors.push("Quantity must be greater than 0")
+    if (!formData.user_id || formData.user_id === NO_USER) newErrors.push("Please select a user")
     if (!formData.movement_date) newErrors.push("Please select a date and time")
 
     if (formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity) {
@@ -182,7 +218,24 @@ export function AddMovementDialogDatabase({
     setIsSubmitting(true)
 
     try {
-      await onSubmit(formData as MovementData)
+      // Transform sentinel values to undefined for API
+      const payload: Omit<MovementData, "id" | "created_at"> = {
+        item_id: String(formData.item_id || ""),
+        movement_type: (formData.movement_type as "IN" | "OUT") || "IN",
+        quantity: Number(formData.quantity || 1),
+        unit_price: formData.unit_price ? Number(formData.unit_price) : undefined,
+        total_value: formData.total_value ? Number(formData.total_value) : undefined,
+        reference_number: formData.reference_number || undefined,
+        supplier_id: formData.supplier_id && formData.supplier_id !== NO_SUPPLIER ? String(formData.supplier_id) : undefined,
+        customer: formData.customer || undefined,
+        notes: formData.notes || undefined,
+        location_id: formData.location_id && formData.location_id !== NO_LOCATION ? String(formData.location_id) : undefined,
+        user_id: String(formData.user_id || NO_USER),
+        received_by: formData.received_by && formData.received_by !== NO_RECEIVED_BY ? String(formData.received_by) : undefined,
+        movement_date: String(formData.movement_date || new Date().toISOString()),
+      }
+
+      await onSubmit(payload)
       onOpenChange(false)
     } catch (error) {
       console.error("Error submitting movement:", error)
@@ -192,7 +245,7 @@ export function AddMovementDialogDatabase({
   }
 
   const handleBarcodeSearch = (barcode: string) => {
-    const item = stockItems.find((item) => item.barcode === barcode)
+    const item = stockItemsList.find((item) => item.barcode === barcode)
     if (item) {
       handleItemSelect(item)
     } else {
@@ -333,7 +386,7 @@ export function AddMovementDialogDatabase({
               <div className="space-y-3">
                 <Label>Movement Type *</Label>
                 <RadioGroup
-                  value={formData.movement_type}
+                  value={(formData.movement_type as "IN" | "OUT") || "IN"}
                   onValueChange={(value: "IN" | "OUT") => setFormData({ ...formData, movement_type: value })}
                   className="grid grid-cols-2 gap-4"
                 >
@@ -401,10 +454,10 @@ export function AddMovementDialogDatabase({
               </div>
 
               {/* Total Value */}
-              {formData.total_value && (
+              {formData.total_value !== undefined && (
                 <div className="space-y-2">
                   <Label>Total Value</Label>
-                  <div className="text-2xl font-bold text-green-600">${formData.total_value.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-600">${Number(formData.total_value).toFixed(2)}</div>
                 </div>
               )}
 
@@ -423,16 +476,21 @@ export function AddMovementDialogDatabase({
                 {/* Location */}
                 <div className="space-y-2">
                   <Label htmlFor="location">Location</Label>
-                  <Select value={formData.location_id || ""} onValueChange={(value) => setFormData({ ...formData, location_id: value })}>
+                  <Select
+                    value={formData.location_id || NO_LOCATION}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, location_id: value === NO_LOCATION ? "" : String(value) }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
                       {locationsList.length === 0 ? (
-                        <SelectItem value="">No locations</SelectItem>
+                        <SelectItem value={NO_LOCATION} disabled>
+                          No locations available
+                        </SelectItem>
                       ) : (
                         locationsList.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
+                          <SelectItem key={String(location.id)} value={String(location.id)}>
                             {location.name} ({location.code})
                           </SelectItem>
                         ))
@@ -446,16 +504,21 @@ export function AddMovementDialogDatabase({
                 {/* User */}
                 <div className="space-y-2">
                   <Label htmlFor="user">User *</Label>
-                  <Select value={formData.user_id || ""} onValueChange={(value) => setFormData({ ...formData, user_id: value })}>
+                  <Select
+                    value={formData.user_id || NO_USER}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, user_id: value === NO_USER ? "" : String(value) }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select user" />
                     </SelectTrigger>
                     <SelectContent>
                       {usersList.length === 0 ? (
-                        <SelectItem value="">No users</SelectItem>
+                        <SelectItem value={NO_USER} disabled>
+                          No users available
+                        </SelectItem>
                       ) : (
                         usersList.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
+                          <SelectItem key={String(user.id)} value={String(user.id)}>
                             {user.name}
                           </SelectItem>
                         ))
@@ -481,35 +544,46 @@ export function AddMovementDialogDatabase({
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="supplier_id">Supplier</Label>
-                    <Select value={formData.supplier_id || ""} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+                    <Select
+                      value={formData.supplier_id || NO_SUPPLIER}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, supplier_id: value === NO_SUPPLIER ? "" : String(value) }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select supplier" />
                       </SelectTrigger>
                       <SelectContent>
                         {suppliersList.length === 0 ? (
-                          <SelectItem value="">No suppliers available</SelectItem>
+                          <SelectItem value={NO_SUPPLIER} disabled>
+                            No suppliers available
+                          </SelectItem>
                         ) : (
                           suppliersList.map((supplier) => (
-                            <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name} ({supplier.code})
+                            <SelectItem key={String(supplier.id)} value={String(supplier.id)}>
+                              {supplier.name} {supplier.code ? `(${supplier.code})` : ""}
                             </SelectItem>
                           ))
                         )}
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="received_by">Received By</Label>
-                    <Select value={formData.received_by || ""} onValueChange={(value) => setFormData({ ...formData, received_by: value })}>
+                    <Select
+                      value={(formData.received_by as string) || NO_RECEIVED_BY}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, received_by: value === NO_RECEIVED_BY ? "" : String(value) }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
                         {usersList.length === 0 ? (
-                          <SelectItem value="">No users</SelectItem>
+                          <SelectItem value={NO_RECEIVED_BY} disabled>
+                            No users available
+                          </SelectItem>
                         ) : (
                           usersList.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
+                            <SelectItem key={`recv-${String(user.id)}`} value={String(user.id)}>
                               {user.name}
                             </SelectItem>
                           ))
@@ -533,13 +607,7 @@ export function AddMovementDialogDatabase({
               {/* Notes */}
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes || ""}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Additional notes about this movement"
-                  rows={3}
-                />
+                <Textarea id="notes" value={formData.notes || ""} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} />
               </div>
             </>
           )}
@@ -558,7 +626,6 @@ export function AddMovementDialogDatabase({
   )
 }
 
-// --- Option A compatibility exports ---
-// Provide the symbol your pages import (named) and a default export
+// compatibility: named + default export
 export const AddMovementDialog = AddMovementDialogDatabase
 export default AddMovementDialogDatabase
