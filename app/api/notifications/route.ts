@@ -1,85 +1,67 @@
+// app/api/notifications/route.ts
 import { type NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/database"
 import jwt from "jsonwebtoken"
+import { query } from "@/lib/database" // your existing helper that returns { rows, ... }
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
+type NotificationRow = {
+  id: string
+  title: string
+  message: string
+  type: string
+  created_at: string | Date
+  read_at: string | null
+  user_id?: string | null
+  meta?: any
+}
+
 export async function GET(request: NextRequest) {
   try {
+    // token: Authorization header "Bearer ..." or cookie "auth_token"
     const token =
-      request.headers.get("authorization")?.replace("Bearer ", "") || request.cookies.get("auth_token")?.value
+      request.headers.get("authorization")?.replace("Bearer ", "") ||
+      request.cookies.get("auth_token")?.value
 
-    if (!token) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 })
+    if (!token) return NextResponse.json({ error: "No token provided" }, { status: 401 })
+
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as any
+    } catch (err) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any
+    const userId = decoded.userId ?? decoded.id ?? null
 
-    // Get notifications for the user
-    const result = await query(
-      `SELECT * FROM notifications 
-       WHERE user_id = $1 OR user_id IS NULL 
-       ORDER BY created_at DESC 
-       LIMIT 20`,
-      [decoded.userId],
-    )
+    // Query notifications intended for this user OR global (user_id IS NULL)
+    const sql = `
+      SELECT id, title, message, type, created_at, read_at, user_id, meta
+      FROM notifications
+      WHERE (user_id = $1 OR user_id IS NULL)
+      ORDER BY created_at DESC
+      LIMIT 50
+    `
+    const result = await query(sql, [userId])
 
-    interface NotificationRow {
-        id: string;
-        title: string;
-        message: string;
-        type: string;
-        created_at: string | number | Date;
-        read_at: string | null;
-    }
+    const rows = (result.rows ?? []) as NotificationRow[]
 
-    interface Notification {
-        id: string;
-        title: string;
-        message: string;
-        type: string;
-        timestamp: string;
-        read: boolean;
-    }
-
-    const notifications: Notification[] = (result.rows as NotificationRow[]).map((notification) => ({
-        id: notification.id,
-        title: notification.title,
-        message: notification.message,
-        type: notification.type,
-        timestamp: new Date(notification.created_at).toLocaleString(),
-        read: notification.read_at !== null,
+    const notifications = rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      message: r.message,
+      type: r.type,
+      timestamp: new Date(r.created_at).toISOString(),
+      read: r.read_at !== null,
+      meta: r.meta ?? null,
     }))
 
-    return NextResponse.json(notifications)
+    return NextResponse.json({ notifications })
   } catch (error) {
     console.error("Notifications fetch error:", error)
-    // Return default notifications if database fails
-    return NextResponse.json([
-      {
-        id: "1",
-        title: "Low Stock Alert",
-        message: "iPhone 13 Pro is running low (5 units remaining)",
-        type: "warning",
-        timestamp: "2 minutes ago",
-        read: false,
-      },
-      {
-        id: "2",
-        title: "New Stock Movement",
-        message: "100 units of Samsung Galaxy S23 added to Main Warehouse",
-        type: "success",
-        timestamp: "1 hour ago",
-        read: false,
-      },
-      {
-        id: "3",
-        title: "System Update",
-        message: "Inventory system will be updated tonight at 2 AM",
-        type: "info",
-        timestamp: "3 hours ago",
-        read: true,
-      },
-    ])
+    return NextResponse.json(
+      { error: "Failed to fetch notifications", details: (error as any)?.message ?? String(error) },
+      { status: 500 },
+    )
   }
 }
