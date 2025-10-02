@@ -15,11 +15,12 @@ import { BarcodeScanner } from "@/components/barcode-scanner"
 import { BarcodeGenerator } from "@/components/barcode-generator"
 import { ItemLookupResult } from "@/components/item-lookup-result"
 import { ItemNotFound } from "@/components/item-not-found"
+import { toast } from "@/components/ui/use-toast"
 
 export interface StockItem {
   id: string, name: string,  description?: string, quantity: number, unit_price: number,  min_quantity: number,  
   status: "in_stock" | "low_stock" | "out_of_stock", barcode: string, category_id: string, subcategory_id: string, 
-  location_id: string, category_name: string, subcategory_name: string, location_name: string, location_code: string, created_by_name: string
+  location_id: string, supplier_id?: string, category_name: string, subcategory_name: string, location_name: string, location_code: string, created_by_name: string
   created_at: string, updated_at: string
 }
 
@@ -63,6 +64,7 @@ export default function InventoryPageDatabase() {
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false)
   
   const [searchTerm, setSearchTerm] = useState("")
   const [locationFilter, setLocationFilter] = useState<string>("all")
@@ -91,6 +93,8 @@ export default function InventoryPageDatabase() {
   const [isItemResultOpen, setIsItemResultOpen] = useState(false)
   const [isItemNotFoundOpen, setIsItemNotFoundOpen] = useState(false)
 
+  
+
   // View & Edit states
   const [scannedItem, setScannedItem] = useState<StockItem | null>(null)
   const [notFoundBarcode, setNotFoundBarcode] = useState("")
@@ -106,6 +110,7 @@ export default function InventoryPageDatabase() {
     min_quantity: 0,
     category_id: "", // kept empty string for placeholder
     location_id: "",
+    supplier_id: "",
   })
 
   useEffect(() => {
@@ -122,6 +127,136 @@ export default function InventoryPageDatabase() {
       setLoading(false)
     }
   }
+
+    // fetch suppliers once
+    useEffect(() => {
+      let mounted = true
+      const fetchSuppliers = async () => {
+        setLoadingSuppliers(true)
+        try {
+          const res = await fetch("/api/suppliers")
+          if (!res.ok) throw new Error("Failed to fetch suppliers")
+          const data = await res.json()
+          // backend might return { suppliers: [...] } or array directly
+          const arr = Array.isArray(data) ? data : data?.suppliers ?? []
+          if (mounted) setSuppliers(arr)
+        } catch (err) {
+          console.error("Error fetching suppliers:", err)
+          if (mounted) setSuppliers([])
+        } finally {
+          if (mounted) setLoadingSuppliers(false)
+        }
+      }
+      fetchSuppliers()
+      return () => {
+        mounted = false
+      }
+    }, [])
+
+      // open edit modal and populate editForm
+  const openEdit = (item: StockItem) => {
+    setEditingItem(item)
+    setEditForm({
+      name: item.name || "",
+      description: item.description || "",
+      quantity: item.quantity || 0,
+      unit_price: Number(item.unit_price) || 0,
+      min_quantity: item.min_quantity || 0,
+      category_id: item.category_id || "UNSPECIFIED",
+      location_id: item.location_id || "UNSPECIFIED",
+      supplier_id: item.supplier_id || "UNSPECIFIED",
+    })
+    setIsEditOpen(true)
+  }
+
+  // reflect editingItem changes to form (if changed externally)
+  useEffect(() => {
+    if (!editingItem) return
+    setEditForm((prev) => ({
+      ...prev,
+      name: editingItem.name || prev.name,
+      description: editingItem.description || prev.description,
+      quantity: editingItem.quantity || prev.quantity,
+      unit_price: Number(editingItem.unit_price) || prev.unit_price,
+      min_quantity: editingItem.min_quantity || prev.min_quantity,
+      category_id: editingItem.category_id || prev.category_id,
+      location_id: editingItem.location_id || prev.location_id,
+      supplier_id: editingItem.supplier_id || prev.supplier_id,
+    }))
+  }, [editingItem])
+
+  const closeEdit = () => {
+    setIsEditOpen(false)
+    setEditingItem(null)
+    // optional: reset form
+    setEditForm({
+      name: "",
+      description: "",
+      quantity: 0,
+      unit_price: 0,
+      min_quantity: 0,
+      category_id: "UNSPECIFIED",
+      location_id: "UNSPECIFIED",
+      supplier_id: "UNSPECIFIED",
+    })
+  }
+
+  // submit edit
+  const submitEdit = async () => {
+    if (!editingItem) return
+    const payload = {
+      name: editForm.name,
+      description: editForm.description,
+      quantity: Number(editForm.quantity),
+      unit_price: Number(editForm.unit_price),
+      min_quantity: Number(editForm.min_quantity),
+      category_id: editForm.category_id === "UNSPECIFIED" ? null : editForm.category_id,
+      location_id: editForm.location_id === "UNSPECIFIED" ? null : editForm.location_id,
+      supplier_id: editForm.supplier_id === "UNSPECIFIED" ? null : editForm.supplier_id,
+    }
+
+    try {
+      const res = await fetch(`/api/items/${editingItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        toast({
+          title: "Update failed",
+          description: err?.error || "Failed to update item",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const updated = await res.json()
+
+      // update local items array
+      setInventory((prev: StockItem[]) =>
+        prev.map((it: StockItem) => (String(it.id) === String(updated.id) ? updated as StockItem : it))
+      )
+
+      // update currently editing item + close modal
+      setEditingItem(updated)
+      toast({
+        title: "Saved",
+        description: "Item updated successfully",
+      })
+      closeEdit()
+    } catch (err) {
+      console.error("Error updating item:", err)
+      toast({
+        title: "Update failed",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
+  
 
   const fetchInventory = async () => {
     try {
@@ -343,46 +478,69 @@ export default function InventoryPageDatabase() {
       min_quantity: item.min_quantity ?? 0,
       category_id: item.category_id ?? "",
       location_id: item.location_id ?? "",
+      supplier_id: item.supplier_id ?? "",
     })
     setIsEditOpen(true)
   }
 
-  const submitEdit = async () => {
-    if (!editingItem) return
-    const payload = {
-      name: editForm.name,
-      description: editForm.description,
-      quantity: Number(editForm.quantity),
-      unit_price: Number(editForm.unit_price),
-      min_quantity: Number(editForm.min_quantity),
-      // convert unspecified/placeholder to null for backend
-      category_id: editForm.category_id && editForm.category_id !== "UNSPECIFIED" ? editForm.category_id : null,
-      location_id: editForm.location_id && editForm.location_id !== "UNSPECIFIED" ? editForm.location_id : null,
-      status:
-        Number(editForm.quantity) === 0
-          ? "out_of_stock"
-          : Number(editForm.min_quantity) && Number(editForm.quantity) < Number(editForm.min_quantity)
-          ? "low_stock"
-          : "in_stock",
-    }
-    try {
-      const response = await fetch(`/api/stock-items/${editingItem.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-      if (response.ok) {
-        // close and refresh
-        setIsEditOpen(false)
-        setEditingItem(null)
-        await fetchInventory()
-      } else {
-        console.error("Failed to update item")
-      }
-    } catch (error) {
-      console.error(error)
-    }
-  }
+  // const submitEdit = async () => {
+  //   if (!editingItem) return
+  //   const payload = {
+  //     name: editForm.name,
+  //     description: editForm.description,
+  //     quantity: Number(editForm.quantity),
+  //     unit_price: Number(editForm.unit_price),
+  //     min_quantity: Number(editForm.min_quantity),
+  //     // convert unspecified/placeholder to null for backend
+  //     category_id: editForm.category_id && editForm.category_id !== "UNSPECIFIED" ? editForm.category_id : null,
+  //     location_id: editForm.location_id && editForm.location_id !== "UNSPECIFIED" ? editForm.location_id : null,
+  //     supplier_id: editForm.supplier_id === "UNSPECIFIED" ? null : editForm.supplier_id,
+  //     status
+  //     :
+  //       Number(editForm.quantity) === 0
+  //         ? "out_of_stock"
+  //         : Number(editForm.min_quantity) && Number(editForm.quantity) < Number(editForm.min_quantity)
+  //         ? "low_stock"
+  //         : "in_stock",
+  //   }
+  //   try {
+  //     const response = await fetch(`/api/stock-items/${editingItem.id}`, {
+  //       method: "PUT",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(payload),
+  //     })
+  //     if (!res.ok) {
+  //       const err = await res.json().catch(() => null)
+  //       toast({
+  //         title: "Update failed",
+  //         description: err?.error || "Failed to update item",
+  //         variant: "destructive",
+  //       })
+  //       return
+  //     }
+
+  //     const updated = await res.json()
+
+  //     // update local items array
+  //     setItems((prev) => prev.map((it) => (String(it.id) === String(updated.id) ? updated : it)))
+
+  //     // update currently editing item + close modal
+  //     setEditingItem(updated)
+  //     toast({
+  //       title: "Saved",
+  //       description: "Item updated successfully",
+  //     })
+  //     closeEdit()
+  //   } catch (err) {
+  //     console.error("Error updating item:", err)
+  //     toast({
+  //       title: "Update failed",
+  //       description: "An unexpected error occurred",
+  //       variant: "destructive",
+  //     })
+  //   }
+  // }
+
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return
@@ -1158,3 +1316,7 @@ export default function InventoryPageDatabase() {
     </div>
   )
 }
+function setItems(arg0: (prev: any) => any) {
+  throw new Error("Function not implemented.")
+}
+
