@@ -1,3 +1,4 @@
+// components/movement-details-dialog.tsx
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -25,8 +26,8 @@ interface StockMovement {
   item_name: string
   movement_type: "IN" | "OUT"
   quantity: number
-  unit_price?: number
-  total_value?: number
+  unit_price?: number | string | null
+  total_value?: number | string | null
   notes?: string
   location?: string
   user_name?: string
@@ -43,9 +44,19 @@ interface MovementDetailsDialogProps {
   movement: StockMovement
 }
 
+function fmtNumber(value: unknown, decimals = 2) {
+  const n = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(n)) return null
+  return n.toFixed(decimals)
+}
+
 export function MovementDetailsDialog({ open, onOpenChange, movement }: MovementDetailsDialogProps) {
   const formatDateTime = (dateString: string) => {
-    return format(new Date(dateString), "PPP 'at' p")
+    try {
+      return format(new Date(dateString), "PPP 'at' p")
+    } catch {
+      return dateString
+    }
   }
 
   const getMovementIcon = (type: "IN" | "OUT") => {
@@ -55,6 +66,9 @@ export function MovementDetailsDialog({ open, onOpenChange, movement }: Movement
       <TrendingDown className="h-5 w-5 text-red-600" />
     )
   }
+
+  const totalValueFormatted = fmtNumber(movement.total_value)
+  const unitPriceFormatted = fmtNumber(movement.unit_price)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,12 +106,12 @@ export function MovementDetailsDialog({ open, onOpenChange, movement }: Movement
                   </div>
                 </div>
 
-                {movement.total_value && (
+                {totalValueFormatted !== null && (
                   <div className="flex items-center gap-3">
                     <DollarSign className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm text-muted-foreground">Total Value</p>
-                      <p className="font-semibold text-lg">${movement.total_value.toFixed(2)}</p>
+                      <p className="font-semibold text-lg">${totalValueFormatted}</p>
                     </div>
                   </div>
                 )}
@@ -156,12 +170,12 @@ export function MovementDetailsDialog({ open, onOpenChange, movement }: Movement
               <CardContent className="p-6">
                 <h4 className="font-semibold mb-4">Transaction Details</h4>
                 <div className="space-y-4">
-                  {movement.unit_price && (
+                  {unitPriceFormatted !== null && (
                     <div className="flex items-center gap-3">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm text-muted-foreground">Unit Price</p>
-                        <p className="font-medium">${movement.unit_price.toFixed(2)}</p>
+                        <p className="font-medium">${unitPriceFormatted}</p>
                       </div>
                     </div>
                   )}
@@ -234,18 +248,18 @@ export function MovementDetailsDialog({ open, onOpenChange, movement }: Movement
                   <span className="text-muted-foreground">Quantity:</span>
                   <span className="font-medium">{movement.quantity} units</span>
                 </div>
-                {movement.unit_price && (
+                {unitPriceFormatted !== null && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Unit Price:</span>
-                    <span className="font-medium">${movement.unit_price.toFixed(2)}</span>
+                    <span className="font-medium">${unitPriceFormatted}</span>
                   </div>
                 )}
-                {movement.total_value && (
+                {totalValueFormatted !== null && (
                   <>
                     <Separator className="my-2" />
                     <div className="flex justify-between font-semibold">
                       <span>Total Value:</span>
-                      <span className="text-lg">${movement.total_value.toFixed(2)}</span>
+                      <span className="text-lg">${totalValueFormatted}</span>
                     </div>
                   </>
                 )}
