@@ -17,13 +17,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 interface StockItem {
   id: string
   name: string
-  barcode: string
+  barcode: string | null
   quantity: number
   unit_price: number
-  category_name: string
-  subcategory_name: string
-  location_name: string
-  location_code: string
+  category_name: string | null
+  subcategory_name: string | null
+  location_name: string | null
+  location_code: string | null
 }
 
 interface Location {
@@ -121,7 +121,12 @@ export function AddMovementDialogDatabase({
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      user_id: prev.user_id && prev.user_id !== NO_USER ? prev.user_id : usersList[0]?.id ? String(usersList[0].id) : NO_USER,
+      user_id:
+        prev.user_id && prev.user_id !== NO_USER
+          ? prev.user_id
+          : usersList[0]?.id
+          ? String(usersList[0].id)
+          : NO_USER,
       location_id:
         prev.location_id && prev.location_id !== NO_LOCATION
           ? prev.location_id
@@ -157,14 +162,15 @@ export function AddMovementDialogDatabase({
   }, [open])
 
   useEffect(() => {
-    // Filter items based on search term
-    if (searchTerm) {
-      const filtered = stockItemsList.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.category_name.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+    // Filter items based on search term — defensive: some fields may be null/undefined
+    const q = String(searchTerm || "").toLowerCase().trim()
+    if (q) {
+      const filtered = stockItemsList.filter((item) => {
+        const name = String(item?.name || "").toLowerCase()
+        const barcode = String(item?.barcode || "").toLowerCase()
+        const category = String(item?.category_name || "").toLowerCase()
+        return name.includes(q) || barcode.includes(q) || category.includes(q)
+      })
       setFilteredItems(filtered)
     } else {
       setFilteredItems(stockItemsList.slice(0, 10)) // Show first 10 items by default
@@ -173,7 +179,12 @@ export function AddMovementDialogDatabase({
 
   useEffect(() => {
     // Calculate total value when quantity or unit price changes
-    if (formData.quantity !== undefined && formData.unit_price !== undefined && !Number.isNaN(Number(formData.quantity)) && !Number.isNaN(Number(formData.unit_price))) {
+    if (
+      formData.quantity !== undefined &&
+      formData.unit_price !== undefined &&
+      !Number.isNaN(Number(formData.quantity)) &&
+      !Number.isNaN(Number(formData.unit_price))
+    ) {
       setFormData((prev) => ({
         ...prev,
         total_value: Number(prev.quantity || 0) * Number(prev.unit_price || 0),
@@ -187,8 +198,8 @@ export function AddMovementDialogDatabase({
       ...prev,
       item_id: item.id,
       unit_price: item.unit_price,
-      location_id: locationsList.find((l) => l.name === item.location_name)?.id
-        ? String(locationsList.find((l) => l.name === item.location_name)!.id)
+      location_id: locationsList.find((l) => String(l.name) === String(item.location_name))?.id
+        ? String(locationsList.find((l) => String(l.name) === String(item.location_name))!.id)
         : prev.location_id,
     }))
     setSearchTerm("")
@@ -202,7 +213,7 @@ export function AddMovementDialogDatabase({
     if (!formData.user_id || formData.user_id === NO_USER) newErrors.push("Please select a user")
     if (!formData.movement_date) newErrors.push("Please select a date and time")
 
-    if (formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity) {
+    if (formData.movement_type === "OUT" && selectedItem && Number(formData.quantity!) > selectedItem.quantity) {
       newErrors.push(`Cannot remove ${formData.quantity} items. Only ${selectedItem.quantity} available in stock.`)
     }
 
@@ -226,12 +237,14 @@ export function AddMovementDialogDatabase({
         unit_price: formData.unit_price ? Number(formData.unit_price) : undefined,
         total_value: formData.total_value ? Number(formData.total_value) : undefined,
         reference_number: formData.reference_number || undefined,
-        supplier_id: formData.supplier_id && formData.supplier_id !== NO_SUPPLIER ? String(formData.supplier_id) : undefined,
+        supplier_id:
+          formData.supplier_id && formData.supplier_id !== NO_SUPPLIER ? String(formData.supplier_id) : undefined,
         customer: formData.customer || undefined,
         notes: formData.notes || undefined,
         location_id: formData.location_id && formData.location_id !== NO_LOCATION ? String(formData.location_id) : undefined,
         user_id: String(formData.user_id || NO_USER),
-        received_by: formData.received_by && formData.received_by !== NO_RECEIVED_BY ? String(formData.received_by) : undefined,
+        received_by:
+          formData.received_by && formData.received_by !== NO_RECEIVED_BY ? String(formData.received_by) : undefined,
         movement_date: String(formData.movement_date || new Date().toISOString()),
       }
 
@@ -245,7 +258,7 @@ export function AddMovementDialogDatabase({
   }
 
   const handleBarcodeSearch = (barcode: string) => {
-    const item = stockItemsList.find((item) => item.barcode === barcode)
+    const item = stockItemsList.find((item) => String(item?.barcode || "") === String(barcode))
     if (item) {
       handleItemSelect(item)
     } else {
@@ -312,13 +325,13 @@ export function AddMovementDialogDatabase({
                           <div className="flex-1">
                             <div className="font-medium">{item.name}</div>
                             <div className="text-sm text-muted-foreground">
-                              {item.category_name} • {item.subcategory_name}
+                              {String(item.category_name || "")} • {String(item.subcategory_name || "")}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge variant="outline" className="font-mono text-xs">
-                                {item.barcode}
+                                {String(item.barcode || "")}
                               </Badge>
-                              <Badge variant="secondary">{item.location_code}</Badge>
+                              <Badge variant="secondary">{String(item.location_code || "")}</Badge>
                             </div>
                           </div>
                           <div className="text-right">
@@ -348,13 +361,13 @@ export function AddMovementDialogDatabase({
                       <div>
                         <div className="font-medium">{selectedItem.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {selectedItem.category_name} • {selectedItem.subcategory_name}
+                          {String(selectedItem.category_name || "")} • {String(selectedItem.subcategory_name || "")}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="outline" className="font-mono text-xs">
-                            {selectedItem.barcode}
+                            {String(selectedItem.barcode || "")}
                           </Badge>
-                          <Badge variant="secondary">{selectedItem.location_code}</Badge>
+                          <Badge variant="secondary">{String(selectedItem.location_code || "")}</Badge>
                         </div>
                       </div>
                     </div>
@@ -431,7 +444,7 @@ export function AddMovementDialogDatabase({
                     onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
                     placeholder="Enter quantity"
                   />
-                  {formData.movement_type === "OUT" && selectedItem && formData.quantity! > selectedItem.quantity && (
+                  {formData.movement_type === "OUT" && selectedItem && Number(formData.quantity!) > selectedItem.quantity && (
                     <p className="text-sm text-red-600">
                       Warning: Exceeds available stock ({selectedItem.quantity} units)
                     </p>
@@ -478,7 +491,9 @@ export function AddMovementDialogDatabase({
                   <Label htmlFor="location">Location</Label>
                   <Select
                     value={formData.location_id || NO_LOCATION}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, location_id: value === NO_LOCATION ? "" : String(value) }))}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, location_id: value === NO_LOCATION ? "" : String(value) }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select location" />
@@ -546,7 +561,9 @@ export function AddMovementDialogDatabase({
                     <Label htmlFor="supplier_id">Supplier</Label>
                     <Select
                       value={formData.supplier_id || NO_SUPPLIER}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, supplier_id: value === NO_SUPPLIER ? "" : String(value) }))}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, supplier_id: value === NO_SUPPLIER ? "" : String(value) }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select supplier" />
@@ -571,7 +588,9 @@ export function AddMovementDialogDatabase({
                     <Label htmlFor="received_by">Received By</Label>
                     <Select
                       value={(formData.received_by as string) || NO_RECEIVED_BY}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, received_by: value === NO_RECEIVED_BY ? "" : String(value) }))}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, received_by: value === NO_RECEIVED_BY ? "" : String(value) }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select user" />
