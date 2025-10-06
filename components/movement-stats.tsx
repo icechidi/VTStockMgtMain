@@ -1,11 +1,12 @@
+// components/movement-stats.tsx
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Package, DollarSign } from "lucide-react"
 
 interface StockMovement {
-  id: number
+  id: number | string
   movement_type: "IN" | "OUT"
   quantity: number
   total_value?: number
@@ -13,78 +14,123 @@ interface StockMovement {
 }
 
 interface MovementStatsProps {
-  movements: StockMovement[]
+  /** optional preloaded movements; if empty or undefined the component will fetch recent movements itself */
+  movements?: StockMovement[]
+  /** optional URL for fetch (useful for testing) */
+  fetchUrl?: string
 }
 
-export function MovementStats({ movements }: MovementStatsProps) {
-  const today = new Date()
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+export function MovementStats({ movements: incomingMovements = [], fetchUrl = "/api/movements?limit=100" }: MovementStatsProps) {
+  const [fetchedMovements, setFetchedMovements] = useState<StockMovement[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const thisMonthMovements = movements.filter((m) => new Date(m.movement_date) >= thisMonth)
-  const lastMonthMovements = movements.filter(
-    (m) => new Date(m.movement_date) >= lastMonth && new Date(m.movement_date) < thisMonth,
-  )
+  // Use incomingMovements if provided and non-empty; otherwise use fetchedMovements
+  const effectiveMovements = useMemo(() => {
+    if (Array.isArray(incomingMovements) && incomingMovements.length > 0) return incomingMovements
+    if (Array.isArray(fetchedMovements)) return fetchedMovements
+    return []
+  }, [incomingMovements, fetchedMovements])
 
-  const calculateStats = (movementList: StockMovement[]) => {
-    const stockIn = movementList.filter((m) => m.movement_type === "IN")
-    const stockOut = movementList.filter((m) => m.movement_type === "OUT")
+  useEffect(() => {
+    // Only fetch if caller didn't provide data
+    if (Array.isArray(incomingMovements) && incomingMovements.length > 0) return
 
-  // Example initial data, replace with your actual data source or fetch logic
-  const [movements, setMovements] = useState<StockMovement[]>([
-    {
-      id: 1,
-      movement_type: "IN",
-      quantity: 100,
-      total_value: 5000,
-      movement_date: "2025-07-01",
-    },
-    {
-      id: 2,
-      movement_type: "OUT",
-      quantity: 20,
-      total_value: 1000,
-      movement_date: "2025-07-05",
-    },
-    // ...more data
-  ])
+    let mounted = true
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(fetchUrl)
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
+        const data = await res.json()
+        // Expect server to return an array; if API returns {movements: [...]}, adapt
+        let rows: any[] = []
+        if (Array.isArray(data)) rows = data
+        else if (Array.isArray((data as any).movements)) rows = (data as any).movements
+        else if (Array.isArray((data as any).data)) rows = (data as any).data
+        else rows = []
 
-  // Example handlers for adding/editing/deleting movements
-  const handleAddMovement = (newMovement: StockMovement) => {
-    setMovements(prev => [...prev, newMovement])
-  }
+        // Normalize rows to StockMovement shape conservatively
+        const normalized: StockMovement[] = rows.map((r: any) => ({
+          id: r.id,
+          movement_type: r.movement_type ?? r.type ?? "IN",
+          quantity: Number.isFinite(Number(r.quantity)) ? Number(r.quantity) : 0,
+          total_value: r.total_value === undefined || r.total_value === null ? undefined : Number(r.total_value),
+          movement_date: r.movement_date ?? r.created_at ?? new Date().toISOString(),
+        }))
 
-  const handleEditMovement = (id: number, updated: StockMovement) => {
-    setMovements(prev => prev.map(m => m.id === id ? updated : m))
-  }
+        if (mounted) setFetchedMovements(normalized)
+      } catch (err: any) {
+        console.error("MovementStats fetch error:", err)
+        if (mounted) setError(String(err?.message ?? err))
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
 
-  const handleDeleteMovement = (id: number) => {
-    setMovements(prev => prev.filter(m => m.id !== id))
-  }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [incomingMovements, fetchUrl])
+
+  // date bounds for this month / last month
+  const today = useMemo(() => new Date(), [])
+  const thisMonthStart = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today])
+  const lastMonthStart = useMemo(() => new Date(today.getFullYear(), today.getMonth() - 1, 1), [today])
+  const nextMonthStart = useMemo(() => new Date(today.getFullYear(), today.getMonth() + 1, 1), [today])
+
+  const statsForPeriod = (list: StockMovement[]) => {
+    const stockIn = list.filter((m) => m.movement_type === "IN")
+    const stockOut = list.filter((m) => m.movement_type === "OUT")
+
+    const totalMovements = list.length
+    const stockInCount = stockIn.length
+    const stockOutCount = stockOut.length
+    const stockInQuantity = stockIn.reduce((s, m) => s + (Number.isFinite(Number(m.quantity)) ? Number(m.quantity) : 0), 0)
+    const stockOutQuantity = stockOut.reduce((s, m) => s + (Number.isFinite(Number(m.quantity)) ? Number(m.quantity) : 0), 0)
+    const totalValue = list.reduce((s, m) => s + (Number.isFinite(Number(m.total_value)) ? Number(m.total_value) : 0), 0)
 
     return {
-      totalMovements: movementList.length,
-      stockInCount: stockIn.length,
-      stockOutCount: stockOut.length,
-      stockInQuantity: stockIn.reduce((sum, m) => sum + m.quantity, 0),
-      stockOutQuantity: stockOut.reduce((sum, m) => sum + m.quantity, 0),
-      totalValue: Number(movementList.reduce((sum, m) => sum + (m.total_value || 0), 0)) || 0,
+      totalMovements,
+      stockInCount,
+      stockOutCount,
+      stockInQuantity,
+      stockOutQuantity,
+      totalValue,
     }
   }
 
-  const thisMonthStats = calculateStats(thisMonthMovements)
-  const lastMonthStats = calculateStats(lastMonthMovements)
+  const thisMonthMovements = useMemo(
+    () => effectiveMovements.filter((m) => {
+      const d = new Date(m.movement_date)
+      return d >= thisMonthStart && d < nextMonthStart
+    }),
+    [effectiveMovements, thisMonthStart, nextMonthStart],
+  )
 
-  const calculatePercentageChange = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0
-    return ((current - previous) / previous) * 100
+  const lastMonthMovements = useMemo(
+    () => effectiveMovements.filter((m) => {
+      const d = new Date(m.movement_date)
+      return d >= lastMonthStart && d < thisMonthStart
+    }),
+    [effectiveMovements, lastMonthStart, thisMonthStart],
+  )
+
+  const thisMonthStats = useMemo(() => statsForPeriod(thisMonthMovements), [thisMonthMovements])
+  const lastMonthStats = useMemo(() => statsForPeriod(lastMonthMovements), [lastMonthMovements])
+
+  const changePercent = (current: number, previous: number) => {
+    if (previous === 0) return current === 0 ? 0 : 100
+    return ((current - previous) / Math.abs(previous)) * 100
   }
 
   const stats = [
     {
       title: "Total Movements",
       value: thisMonthStats.totalMovements,
-      change: calculatePercentageChange(thisMonthStats.totalMovements, lastMonthStats.totalMovements),
+      change: changePercent(thisMonthStats.totalMovements, lastMonthStats.totalMovements),
       icon: Package,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
@@ -92,7 +138,7 @@ export function MovementStats({ movements }: MovementStatsProps) {
     {
       title: "Stock In",
       value: thisMonthStats.stockInQuantity,
-      change: calculatePercentageChange(thisMonthStats.stockInQuantity, lastMonthStats.stockInQuantity),
+      change: changePercent(thisMonthStats.stockInQuantity, lastMonthStats.stockInQuantity),
       icon: TrendingUp,
       color: "text-green-600",
       bgColor: "bg-green-50",
@@ -100,7 +146,7 @@ export function MovementStats({ movements }: MovementStatsProps) {
     {
       title: "Stock Out",
       value: thisMonthStats.stockOutQuantity,
-      change: calculatePercentageChange(thisMonthStats.stockOutQuantity, lastMonthStats.stockOutQuantity),
+      change: changePercent(thisMonthStats.stockOutQuantity, lastMonthStats.stockOutQuantity),
       icon: TrendingDown,
       color: "text-red-600",
       bgColor: "bg-red-50",
@@ -108,12 +154,25 @@ export function MovementStats({ movements }: MovementStatsProps) {
     {
       title: "Total Value",
       value: `$${(thisMonthStats.totalValue || 0).toFixed(2)}`,
-      change: calculatePercentageChange(thisMonthStats.totalValue || 0, lastMonthStats.totalValue || 0),
+      change: changePercent(thisMonthStats.totalValue || 0, lastMonthStats.totalValue || 0),
       icon: DollarSign,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
   ]
+
+  // render loading/empty states gracefully
+  if (loading) {
+    return <div className="text-center py-6">Loading movement stats…</div>
+  }
+
+  if (error) {
+    return <div className="text-center py-6 text-red-600">Failed to load movement stats: {error}</div>
+  }
+
+  if (effectiveMovements.length === 0) {
+    return <div className="text-center py-6 text-muted-foreground">No movement data available</div>
+  }
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -130,7 +189,7 @@ export function MovementStats({ movements }: MovementStatsProps) {
             <div className="flex items-center text-xs text-muted-foreground">
               <span className={stat.change >= 0 ? "text-green-600" : "text-red-600"}>
                 {stat.change >= 0 ? "+" : ""}
-                {stat.change.toFixed(1)}%
+                {Number(stat.change).toFixed(1)}%
               </span>
               <span className="ml-1">from last month</span>
             </div>
@@ -140,3 +199,5 @@ export function MovementStats({ movements }: MovementStatsProps) {
     </div>
   )
 }
+
+export default MovementStats
