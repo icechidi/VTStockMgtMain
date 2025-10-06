@@ -82,9 +82,9 @@ export default function LoginPage() {
 
   const fillDemoCredentials = (role: "admin" | "manager" | "employee") => {
     const credentials = {
-      admin: { email: "admin@company.com", password: "password123" },
-      manager: { email: "jane@company.com", password: "password123" },
-      employee: { email: "mike@company.com", password: "password123" },
+      admin: { email: "admin@company.com", password: "myNewSecurePassword" },
+      manager: { email: "jane@company.com", password: "myNewSecurePassword" },
+      employee: { email: "mike@company.com", password: "myNewSecurePassword" },
     }
 
     setEmail(credentials[role].email)
