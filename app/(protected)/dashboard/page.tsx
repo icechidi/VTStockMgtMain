@@ -56,7 +56,6 @@ export default async function DashboardPage() {
       </div>
 
       <MovementStats movements={[]} />
-      <MovementStats movements={[]} />
     </div>
   );
 }
