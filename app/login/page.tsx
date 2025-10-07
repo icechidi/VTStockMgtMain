@@ -1,3 +1,4 @@
+// app/(public)/login/page.tsx  (or wherever your login page is)
 "use client"
 
 import type React from "react"
@@ -14,7 +15,6 @@ import { Loader2, Package, Eye, EyeOff } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ForgotPasswordDialog } from "@/components/forgot-password-dialog"
 
-
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -25,21 +25,17 @@ export default function LoginPage() {
   const { toast } = useToast()
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false)
 
-
   // Redirect if already logged in
-
   useEffect(() => {
-    // Check if user is already logged in
     const checkSession = async () => {
-      const session = await getSession();
-      console.log("Session on login page:", session); // Add this line
+      const session = await getSession()
+      console.log("Session on login page:", session)
       if (session?.user?.id) {
-        router.replace("/dashboard");
+        router.replace("/dashboard")
       }
-    };
-    checkSession();
+    }
+    checkSession()
   }, [router])
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,9 +87,47 @@ export default function LoginPage() {
     setPassword(credentials[role].password)
   }
 
+  // Handler passed to ForgotPasswordDialog (optional)
+  const handleForgotPasswordSubmit = async (payload: { email: string }) => {
+    // This example assumes you have an endpoint at /api/auth/forgot-password
+    // that accepts { email } and sends a reset link or similar.
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        toast({
+          title: "Check your email",
+          description: "If that email exists we sent a reset link.",
+        })
+        setForgotPasswordOpen(false)
+        return { ok: true }
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast({
+          title: "Request failed",
+          description: err?.message || "Failed to request password reset.",
+          variant: "destructive",
+        })
+        return { ok: false }
+      }
+    } catch (err) {
+      console.error("Forgot password request failed:", err)
+      toast({
+        title: "Network error",
+        description: "Could not send request. Please try again later.",
+        variant: "destructive",
+      })
+      return { ok: false }
+    }
+  }
+
   return (
-      // Fullscreen fixed wrapper so the card always sits in the center of the viewport
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background">
+    // Fullscreen fixed wrapper so the card always sits in the center of the viewport
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-md">
         <Card className="shadow-2xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
           <CardHeader className="text-center space-y-4 pb-8">
@@ -178,7 +212,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-        
             {/* Forgot Password Link */}
             <div className="mt-4 text-center">
               <Button
@@ -230,6 +263,16 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ---- Render the ForgotPasswordDialog ----
+          - Provide open/onOpenChange so the dialog can open/close.
+          - Provide onSubmit (optional) which should accept { email } and return { ok: boolean }.
+          If your existing ForgotPasswordDialog uses different props adjust accordingly.
+      */}
+      <ForgotPasswordDialog
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+      />
     </div>
   )
 }
