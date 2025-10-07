@@ -1,8 +1,9 @@
+// components/forgot-password-dialog.tsx
 "use client"
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,11 +15,15 @@ import { useToast } from "@/hooks/use-toast"
 interface ForgotPasswordDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /**
+   * Optional: allow parent to prefill email (e.g. from login input)
+   */
+  initialEmail?: string
 }
 
-export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialogProps) {
+export function ForgotPasswordDialog({ open, onOpenChange, initialEmail = "" }: ForgotPasswordDialogProps) {
   const [step, setStep] = useState<"email" | "code" | "password">("email")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(initialEmail)
   const [resetCode, setResetCode] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -26,32 +31,68 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
   const [error, setError] = useState("")
   const { toast } = useToast()
 
+  // Reset dialog state whenever it is opened/closed
+  useEffect(() => {
+    if (!open) {
+      // clear on close
+      setStep("email")
+      setEmail(initialEmail || "")
+      setResetCode("")
+      setNewPassword("")
+      setConfirmPassword("")
+      setLoading(false)
+      setError("")
+    } else {
+      // when opened prefill email if provided
+      setEmail(initialEmail || "")
+      setStep("email")
+      setResetCode("")
+      setNewPassword("")
+      setConfirmPassword("")
+      setError("")
+    }
+  }, [open, initialEmail])
+
+  // Helper to safely parse JSON with fallback
+  const safeJson = async (res: Response) => {
+    try {
+      return await res.json()
+    } catch {
+      return {}
+    }
+  }
+
   const handleSendResetCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setLoading(true)
 
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError("Please enter your email address.")
+      return
+    }
+
+    setLoading(true)
     try {
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail }),
       })
 
       if (response.ok) {
         setStep("code")
         toast({
           title: "Reset Code Sent",
-          description: "Check your email for the password reset code.",
+          description: "If that email exists we sent a reset code. Check your inbox.",
         })
       } else {
-        const data = await response.json()
-        setError(data.error || "Failed to send reset code")
+        const data = await safeJson(response)
+        setError(data?.error || "Failed to send reset code. Please try again.")
       }
-    } catch (error) {
-      setError("An error occurred. Please try again.")
+    } catch (err) {
+      console.error("Forgot password request failed:", err)
+      setError("Network error. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -60,25 +101,34 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-    setLoading(true)
 
+    const trimmedCode = resetCode.trim()
+    if (!trimmedCode) {
+      setError("Please enter the reset code.")
+      return
+    }
+
+    setLoading(true)
     try {
       const response = await fetch("/api/auth/verify-reset-code", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, code: resetCode }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), code: trimmedCode }),
       })
 
       if (response.ok) {
         setStep("password")
+        toast({
+          title: "Code verified",
+          description: "Enter a new password to finish resetting your account.",
+        })
       } else {
-        const data = await response.json()
-        setError(data.error || "Invalid reset code")
+        const data = await safeJson(response)
+        setError(data?.error || "Invalid reset code. Please check and try again.")
       }
-    } catch (error) {
-      setError("An error occurred. Please try again.")
+    } catch (err) {
+      console.error("Verify reset code failed:", err)
+      setError("Network error. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -99,16 +149,13 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
     }
 
     setLoading(true)
-
     try {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
-          code: resetCode,
+          email: email.trim(),
+          code: resetCode.trim(),
           newPassword,
         }),
       })
@@ -119,29 +166,22 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
           description: "Your password has been reset successfully. You can now log in.",
         })
         onOpenChange(false)
-        setStep("email")
-        setEmail("")
-        setResetCode("")
-        setNewPassword("")
-        setConfirmPassword("")
       } else {
-        const data = await response.json()
-        setError(data.error || "Failed to reset password")
+        const data = await safeJson(response)
+        setError(data?.error || "Failed to reset password. Please try again.")
       }
-    } catch (error) {
-      setError("An error occurred. Please try again.")
+    } catch (err) {
+      console.error("Reset password failed:", err)
+      setError("Network error. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
   const handleBack = () => {
-    if (step === "code") {
-      setStep("email")
-    } else if (step === "password") {
-      setStep("code")
-    }
     setError("")
+    if (step === "code") setStep("email")
+    else if (step === "password") setStep("code")
   }
 
   return (
@@ -150,7 +190,7 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {step !== "email" && (
-              <Button variant="ghost" size="icon" onClick={handleBack}>
+              <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Go back">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
@@ -164,24 +204,27 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
         </DialogHeader>
 
         {step === "email" && (
-          <form onSubmit={handleSendResetCode} className="space-y-4">
+          <form onSubmit={handleSendResetCode} className="space-y-4" aria-live="polite">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="fp-email">Email Address</Label>
               <Input
-                id="email"
+                id="fp-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
+                autoFocus
               />
             </div>
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            <Button type="submit" className="w-full" disabled={loading || !email.trim()}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
               Send Reset Code
             </Button>
@@ -189,24 +232,27 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
         )}
 
         {step === "code" && (
-          <form onSubmit={handleVerifyCode} className="space-y-4">
+          <form onSubmit={handleVerifyCode} className="space-y-4" aria-live="polite">
             <div className="space-y-2">
-              <Label htmlFor="code">Reset Code</Label>
+              <Label htmlFor="fp-code">Reset Code</Label>
               <Input
-                id="code"
+                id="fp-code"
                 value={resetCode}
                 onChange={(e) => setResetCode(e.target.value)}
                 placeholder="Enter 6-digit code"
-                maxLength={6}
+                maxLength={10}
                 required
+                autoFocus
               />
             </div>
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            <Button type="submit" className="w-full" disabled={loading || !resetCode.trim()}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Verify Code
             </Button>
@@ -214,22 +260,24 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
         )}
 
         {step === "password" && (
-          <form onSubmit={handleResetPassword} className="space-y-4">
+          <form onSubmit={handleResetPassword} className="space-y-4" aria-live="polite">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="fp-new">New Password</Label>
               <Input
-                id="newPassword"
+                id="fp-new"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
                 required
+                autoFocus
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="fp-confirm">Confirm Password</Label>
               <Input
-                id="confirmPassword"
+                id="fp-confirm"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -237,11 +285,13 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
                 required
               />
             </div>
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reset Password
@@ -252,3 +302,5 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
     </Dialog>
   )
 }
+
+export default ForgotPasswordDialog
