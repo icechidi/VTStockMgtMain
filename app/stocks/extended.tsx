@@ -1,5 +1,6 @@
-"use client"
+"use client" // Marks this file as a client component for Next.js
 
+// Imports: React hooks, UI components, icons, and custom modules
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ import { BarcodeGenerator } from "@/components/barcode-generator"
 import { ItemLookupResult } from "@/components/item-lookup-result"
 import { ItemNotFound } from "@/components/item-not-found"
 
+// Interfaces defining data structures for inventory, categories, and locations
 export interface StockItem {
   id: string
   name: string
@@ -54,32 +56,36 @@ export interface Location {
   current_items: number
 }
 
+// Main component for managing inventory data
 export default function InventoryPageDatabase() {
+  // States for storing fetched data
   const [inventory, setInventory] = useState<StockItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Filters
+  // Filter states
   const [searchTerm, setSearchTerm] = useState("")
   const [locationFilter, setLocationFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
 
-  // Dialog states
+  // Dialog open states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [isBarcodeGeneratorOpen, setIsBarcodeGeneratorOpen] = useState(false)
   const [isItemResultOpen, setIsItemResultOpen] = useState(false)
   const [isItemNotFoundOpen, setIsItemNotFoundOpen] = useState(false)
 
-  // Scanner states
+  // Barcode scanning and lookup states
   const [scannedItem, setScannedItem] = useState<StockItem | null>(null)
   const [notFoundBarcode, setNotFoundBarcode] = useState("")
   const [selectedItemForBarcode, setSelectedItemForBarcode] = useState<StockItem | null>(null)
 
+  // Fetch data on component mount
   useEffect(() => { fetchData() }, [])
 
+  // Fetch inventory, categories, and locations in parallel
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -91,6 +97,7 @@ export default function InventoryPageDatabase() {
     }
   }
 
+  // Fetch inventory with filters
   const fetchInventory = async () => {
     try {
       const params = new URLSearchParams()
@@ -109,6 +116,7 @@ export default function InventoryPageDatabase() {
     }
   }
 
+  // Fetch categories
   const fetchCategories = async () => {
     try {
       const response = await fetch("/api/categories")
@@ -116,6 +124,7 @@ export default function InventoryPageDatabase() {
     } catch (error) { console.error(error) }
   }
 
+  // Fetch locations
   const fetchLocations = async () => {
     try {
       const response = await fetch("/api/locations")
@@ -123,13 +132,13 @@ export default function InventoryPageDatabase() {
     } catch (error) { console.error(error) }
   }
 
-  // Debounced search effect
+  // Debounced effect for live search/filter updates
   useEffect(() => {
     const timer = setTimeout(() => { fetchInventory() }, 500)
     return () => clearTimeout(timer)
   }, [searchTerm, locationFilter, categoryFilter, statusFilter])
 
-  // Other handlers (Add, Scan, Barcode, etc.)
+  // Handlers for CRUD and scanning actions
   const handleAddItem = async (data: any) => {
     try {
       const response = await fetch("/api/stock-items", {
@@ -144,8 +153,13 @@ export default function InventoryPageDatabase() {
     } catch (error) { console.error(error) }
   }
 
+  // Handle item found via barcode scan
   const handleItemFound = (item: StockItem) => { setScannedItem(item); setIsItemResultOpen(true) }
+
+  // Handle item not found via barcode scan
   const handleItemNotFound = (barcode: string) => { setNotFoundBarcode(barcode); setIsItemNotFoundOpen(true) }
+
+  // Perform lookup for scanned barcode
   const handleScanBarcode = async (barcode: string) => {
     try {
       const response = await fetch(`/api/stock-items/barcode/${barcode}`)
@@ -153,8 +167,14 @@ export default function InventoryPageDatabase() {
       else handleItemNotFound(barcode)
     } catch { handleItemNotFound(barcode) }
   }
+
+  // Create new item after not finding barcode
   const handleCreateItemFromBarcode = (barcode: string) => { setIsAddDialogOpen(true); setIsItemNotFoundOpen(false) }
+
+  // Open barcode generator for a selected item
   const handleGenerateBarcode = (item: StockItem) => { setSelectedItemForBarcode(item); setIsBarcodeGeneratorOpen(true); setIsItemResultOpen(false) }
+
+  // Determine badge variant based on item status
   const getStatusBadgeVariant = (status: string) => {
     switch(status) {
       case "in_stock": return "default"
@@ -164,6 +184,7 @@ export default function InventoryPageDatabase() {
     }
   }
 
+  // Loading state UI
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -173,9 +194,10 @@ export default function InventoryPageDatabase() {
     )
   }
 
+  // Main component UI
   return (
     <div className="space-y-6">
-      {/* Header with Add & Scan */}
+      {/* Header with title and action buttons */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Inventory Management</h2>
@@ -187,248 +209,233 @@ export default function InventoryPageDatabase() {
         </div>
       </div>
 
-      {/* Analytics Cards */}
+      {/* Dashboard analytics cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Total items */}
         <Card><CardHeader><CardTitle className="text-sm font-medium">Total Items</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.length}</div></CardContent></Card>
+        {/* Total value */}
         <Card><CardHeader><CardTitle className="text-sm font-medium">Total Value</CardTitle><BarChart3 className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold">${inventory.reduce((sum,item)=>sum+item.unit_price*item.quantity,0).toLocaleString()}</div></CardContent></Card>
+        {/* Low stock count */}
         <Card><CardHeader><CardTitle className="text-sm font-medium">Low Stock</CardTitle><Package className="h-4 w-4 text-yellow-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="low_stock").length}</div></CardContent></Card>
+        {/* Out of stock count */}
         <Card><CardHeader><CardTitle className="text-sm font-medium">Out of Stock</CardTitle><Package className="h-4 w-4 text-red-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="out_of_stock").length}</div></CardContent></Card>
       </div>
 
-      {/* Tabs (Inventory / Locations / Categories / Manage Categories) */}
-{/* Tabs for Inventory, Locations, Categories */}
-<Tabs defaultValue="inventory" className="space-y-4">
-  <TabsList>
-    <TabsTrigger value="inventory">Inventory</TabsTrigger>
-    <TabsTrigger value="locations">Locations</TabsTrigger>
-    <TabsTrigger value="categories">Categories</TabsTrigger>
-    <TabsTrigger value="manage-categories">Manage Categories</TabsTrigger>
-  </TabsList>
+      {/* Tabs for different sections */}
+      <Tabs defaultValue="inventory" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="locations">Locations</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="manage-categories">Manage Categories</TabsTrigger>
+        </TabsList>
 
-  {/* Inventory Tab */}
-  <TabsContent value="inventory" className="space-y-4">
-    {/* Filters */}
-    <div className="flex flex-wrap gap-2 items-center">
-      <Input
-        placeholder="Search by name or barcode..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="max-w-sm"
-      />
-      <Select value={locationFilter} onValueChange={setLocationFilter}>
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Filter by location" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Locations</SelectItem>
-          {locations.map(loc => <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Filter by category" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Categories</SelectItem>
-          {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Filter by status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="in_stock">In Stock</SelectItem>
-          <SelectItem value="low_stock">Low Stock</SelectItem>
-          <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+        {/* Inventory tab with filters and items */}
+        <TabsContent value="inventory" className="space-y-4">
+          {/* Filter bar */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <Input placeholder="Search by name or barcode..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Filter by location" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map(loc => <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Filter by category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="in_stock">In Stock</SelectItem>
+                <SelectItem value="low_stock">Low Stock</SelectItem>
+                <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-    {/* Inventory Cards */}
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {inventory.map(item => (
-        <Card key={item.id} className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex justify-between items-start">
-            <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
-            <Badge variant={getStatusBadgeVariant(item.status)}>{item.status.replace("_", " ")}</Badge>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">{item.description}</p>
-            <div className="flex justify-between text-sm">
-              <span>Qty: {item.quantity}</span>
-              <span>Price: ${Number(item.unit_price).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Location: {item.location_name}</span>
-              <span>Category: {item.category_name}</span>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <Button size="sm" variant="outline" onClick={() => handleGenerateBarcode(item)}>
-                <QrCode className="h-4 w-4 mr-1" />Barcode
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  </TabsContent>
-
-  {/* Locations Tab */}
-  <TabsContent value="locations">
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {locations.map(loc => (
-        <Card key={loc.id}>
-          <CardHeader>
-            <CardTitle>{loc.name}</CardTitle>
-            <CardDescription>{loc.type} | {loc.block}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-between">
-            <span>Capacity: {loc.capacity}</span>
-            <span>Items: {loc.current_items}</span>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  </TabsContent>
-
-  {/* Categories Tab */}
-  <TabsContent value="categories">
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {categories.map(cat => (
-        <Card key={cat.id}>
-          <CardHeader>
-            <CardTitle>{cat.name}</CardTitle>
-            <CardDescription>{cat.subcategories.length} subcategories</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {cat.subcategories.map(sub => (
-              <Badge key={sub.id} variant="secondary" className="mr-1 mb-1">{sub.name}</Badge>
+          {/* Inventory cards display */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {inventory.map(item => (
+              <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="flex justify-between items-start">
+                  <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
+                  <Badge variant={getStatusBadgeVariant(item.status)}>{item.status.replace("_", " ")}</Badge>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{item.description}</p>
+                  <div className="flex justify-between text-sm">
+                    <span>Qty: {item.quantity}</span>
+                    <span>Price: ${Number(item.unit_price).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Location: {item.location_name}</span>
+                    <span>Category: {item.category_name}</span>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" variant="outline" onClick={() => handleGenerateBarcode(item)}>
+                      <QrCode className="h-4 w-4 mr-1" />Barcode
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  </TabsContent>
+          </div>
+        </TabsContent>
 
-  {/* Manage Categories Tab */}
-  <TabsContent value="manage-categories">
-    <CategoryManagementDatabase
-      categories={categories}
-      onCategoriesChange={fetchCategories}
-    />
-  </TabsContent>
-</Tabs>
+        {/* Locations tab */}
+        <TabsContent value="locations">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {locations.map(loc => (
+              <Card key={loc.id}>
+                <CardHeader>
+                  <CardTitle>{loc.name}</CardTitle>
+                  <CardDescription>{loc.type} | {loc.block}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-between">
+                  <span>Capacity: {loc.capacity}</span>
+                  <span>Items: {loc.current_items}</span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
 
+        {/* Categories tab */}
+        <TabsContent value="categories">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {categories.map(cat => (
+              <Card key={cat.id}>
+                <CardHeader>
+                  <CardTitle>{cat.name}</CardTitle>
+                  <CardDescription>{cat.subcategories.length} subcategories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {cat.subcategories.map(sub => (
+                    <Badge key={sub.id} variant="secondary" className="mr-1 mb-1">{sub.name}</Badge>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
 
-      {/* Filtered views, card/table displays, analytics, and dialogs will go here */}
+        {/* Manage categories tab */}
+        <TabsContent value="manage-categories">
+          <CategoryManagementDatabase
+            categories={categories}
+            onCategoriesChange={fetchCategories}
+          />
+        </TabsContent>
+      </Tabs>
 
-      {/* ==========================
-     Dialogs and Barcode Components
-========================== */}
-<AddStockItemDialogDatabase
-  open={isAddDialogOpen}
-  onOpenChange={setIsAddDialogOpen}
-  onSubmit={handleAddItem}
-  categories={categories}
-  locations={locations}
-/>
+      {/* Dialog and barcode-related components */}
+      <AddStockItemDialogDatabase
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleAddItem}
+        categories={categories}
+        locations={locations}
+      />
 
-<BarcodeScanner
-  open={isScannerOpen}
-  onOpenChange={setIsScannerOpen}
-  onItemFound={(item) => {
-    // Map ScannedItem to StockItem shape (fill missing fields with defaults or empty values)
-    const stockItem: StockItem = {
-      id: item.id,
-      name: item.name,
-      description: item.description ?? "",
-      quantity: item.quantity ?? 0,
-      unit_price: item.unit_price ?? 0,
-      //unit_price: Number(item.unit_price ?? 0).toFixed(2) as unknown as number,
-      min_quantity: 0,
-      status: item.status ?? "in_stock",
-      barcode: item.barcode ?? "",
-      category_id: "",
-      subcategory_id: "",
-      location_id: "",
-      category_name: "",
-      subcategory_name: "",
-      location_name: "",
-      location_code: "",
-      created_by_name: "",
-      created_at: "",
-      updated_at: "",
-    }
-    handleItemFound(stockItem)
-  }}
-  onItemNotFound={handleItemNotFound}
-  inventory={inventory.map(item => ({
-    ...item,
-    location: item.location_name ?? "",
-    category: item.category_name ?? "",
-    subcategory: item.subcategory_name ?? "",
-  }))}
-/>
+      <BarcodeScanner
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onItemFound={(item) => {
+          // Convert scanned item to StockItem structure with default fields
+          const stockItem: StockItem = {
+            id: item.id,
+            name: item.name,
+            description: item.description ?? "",
+            quantity: item.quantity ?? 0,
+            unit_price: item.unit_price ?? 0,
+            min_quantity: 0,
+            status: item.status ?? "in_stock",
+            barcode: item.barcode ?? "",
+            category_id: "",
+            subcategory_id: "",
+            location_id: "",
+            category_name: "",
+            subcategory_name: "",
+            location_name: "",
+            location_code: "",
+            created_by_name: "",
+            created_at: "",
+            updated_at: "",
+          }
+          handleItemFound(stockItem)
+        }}
+        onItemNotFound={handleItemNotFound}
+        inventory={inventory.map(item => ({
+          ...item,
+          location: item.location_name ?? "",
+          category: item.category_name ?? "",
+          subcategory: item.subcategory_name ?? "",
+        }))}
+      />
 
-<BarcodeGenerator
-  open={isBarcodeGeneratorOpen}
-  onOpenChange={setIsBarcodeGeneratorOpen}
-  itemId={selectedItemForBarcode?.id}
-  itemName={selectedItemForBarcode?.name}
-  defaultBarcode={selectedItemForBarcode?.barcode}
-/>
+      <BarcodeGenerator
+        open={isBarcodeGeneratorOpen}
+        onOpenChange={setIsBarcodeGeneratorOpen}
+        itemId={selectedItemForBarcode?.id}
+        itemName={selectedItemForBarcode?.name}
+        defaultBarcode={selectedItemForBarcode?.barcode}
+      />
 
-<ItemLookupResult
-  open={isItemResultOpen}
-  onOpenChange={setIsItemResultOpen}
-  item={
-    scannedItem
-      ? {
-          ...scannedItem,
-          location: scannedItem.location_name ?? "",
-          category: scannedItem.category_name ?? "",
-          subcategory: scannedItem.subcategory_name ?? "",
+      <ItemLookupResult
+        open={isItemResultOpen}
+        onOpenChange={setIsItemResultOpen}
+        item={
+          scannedItem
+            ? {
+                ...scannedItem,
+                location: scannedItem.location_name ?? "",
+                category: scannedItem.category_name ?? "",
+                subcategory: scannedItem.subcategory_name ?? "",
+              }
+            : null
         }
-      : null
-  }
-  onGenerateBarcode={
-    (item) => {
-      // Convert ScannedItem to StockItem shape (fill missing fields with defaults or empty values)
-      const stockItem: StockItem = {
-        id: item.id,
-        name: item.name,
-        description: item.description ?? "",
-        quantity: item.quantity ?? 0,
-        unit_price: item.unit_price ?? 0,
-        min_quantity: 0,
-        status: item.status ?? "in_stock",
-        barcode: item.barcode ?? "",
-        category_id: "",
-        subcategory_id: "",
-        location_id: "",
-        category_name: "",
-        subcategory_name: "",
-        location_name: "",
-        location_code: "",
-        created_by_name: "",
-        created_at: "",
-        updated_at: "",
-      }
-      handleGenerateBarcode(stockItem)
-    }
-  }
-/>
+        onGenerateBarcode={
+          (item) => {
+            // Normalize scanned item for barcode generation
+            const stockItem: StockItem = {
+              id: item.id,
+              name: item.name,
+              description: item.description ?? "",
+              quantity: item.quantity ?? 0,
+              unit_price: item.unit_price ?? 0,
+              min_quantity: 0,
+              status: item.status ?? "in_stock",
+              barcode: item.barcode ?? "",
+              category_id: "",
+              subcategory_id: "",
+              location_id: "",
+              category_name: "",
+              subcategory_name: "",
+              location_name: "",
+              location_code: "",
+              created_by_name: "",
+              created_at: "",
+              updated_at: "",
+            }
+            handleGenerateBarcode(stockItem)
+          }
+        }
+      />
 
-<ItemNotFound
-  open={isItemNotFoundOpen}
-  onOpenChange={setIsItemNotFoundOpen}
-  barcode={notFoundBarcode}
-  onCreateItem={handleCreateItemFromBarcode}
-  onSearchAgain={() => setIsScannerOpen(true)}
-/>
-
+      <ItemNotFound
+        open={isItemNotFoundOpen}
+        onOpenChange={setIsItemNotFoundOpen}
+        barcode={notFoundBarcode}
+        onCreateItem={handleCreateItemFromBarcode}
+        onSearchAgain={() => setIsScannerOpen(true)}
+      />
     </div>
   )
 }
