@@ -1247,7 +1247,7 @@ export default function InventoryPageDatabase() {
 
               <div>
                 <label className="text-sm font-medium mb-1 block">Category</label>
-                <Select value={editForm.category_id} onValueChange={(v) => setEditForm((s) => ({ ...s, category_id: v }))}>
+                <Select value={editForm.category_id} onValueChange={(v) => setEditForm((s) => ({ ...s, category_id: v, subcategory_id: "" }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
