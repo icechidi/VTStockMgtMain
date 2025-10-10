@@ -1263,6 +1263,32 @@ export default function InventoryPageDatabase() {
                 </Select>
               </div>
 
+                {/* Subcategory select - depends on the selected category */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Subcategory</label>
+                  <Select
+                    value={editForm.subcategory_id || ""}
+                    onValueChange={(v) => setEditForm((s) => ({ ...s, subcategory_id: v }))}
+                    disabled={!editForm.category_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={editForm.category_id ? "Select subcategory" : "Select category first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!editForm.category_id ? (
+                        <SelectItem value="__no_sub" disabled>Select a category first</SelectItem>
+                      ) : (
+                        (categories.find((c) => c.id === editForm.category_id)?.subcategories || []).map((sc) => (
+                          <SelectItem key={sc.id} value={sc.id}>
+                            {sc.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+
               <div>
                 <label className="text-sm font-medium mb-1 block">Location</label>
                 <Select value={editForm.location_id} onValueChange={(v) => setEditForm((s) => ({ ...s, location_id: v }))}>
