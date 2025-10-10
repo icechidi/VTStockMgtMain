@@ -1,6 +1,9 @@
-"use client"
+"use client" // Next.js directive: this component is rendered on the client
 
+// React hooks
 import { useState, useEffect } from "react"
+
+// UI components
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Icons
 import {
   Search,
   Activity,
@@ -21,10 +26,13 @@ import {
   Trash2,
   RefreshCw,
 } from "lucide-react"
+
+// Custom hooks & components
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
+// Interfaces describing the shape of logs and users
 interface ActivityLog {
   id: string
   user_id: string
@@ -46,35 +54,43 @@ interface SystemUser {
   name: string
 }
 
+// Main exported component for the Activity Logs page
 export function ActivityLogsPage() {
-  const [logs, setLogs] = useState<ActivityLog[]>([])
-  const [users, setUsers] = useState<SystemUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [actionFilter, setActionFilter] = useState<string>("all")
-  const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all")
-  const [userFilter, setUserFilter] = useState<string>("all")
-  const [dateFilter, setDateFilter] = useState<string>("all")
+  // Data states
+  const [logs, setLogs] = useState<ActivityLog[]>([]) // fetched activity logs
+  const [users, setUsers] = useState<SystemUser[]>([]) // system users for filter dropdown
+  const [loading, setLoading] = useState(true) // overall loading indicator
 
-  // Dialog states
+  // Filter and search states
+  const [searchTerm, setSearchTerm] = useState("") // free text search
+  const [actionFilter, setActionFilter] = useState<string>("all") // action type filter
+  const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all") // entity type filter
+  const [userFilter, setUserFilter] = useState<string>("all") // user filter
+  const [dateFilter, setDateFilter] = useState<string>("all") // date range filter (today, week, month, all)
+
+  // Dialog states for viewing details
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null)
 
-  // Pagination
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const itemsPerPage = 50
+  const itemsPerPage = 50 // number of logs per page
 
+  // Toast helper for user notifications
   const { toast } = useToast()
 
+  // Initial data fetch when component mounts
   useEffect(() => {
     fetchData()
   }, [])
 
+  // Fetch logs whenever filters or page change
   useEffect(() => {
     fetchLogs()
   }, [currentPage, searchTerm, actionFilter, entityTypeFilter, userFilter, dateFilter])
 
+  // Fetch logs and users in parallel
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -86,6 +102,7 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Fetch activity logs with applied filters and pagination
   const fetchLogs = async () => {
     try {
       const params = new URLSearchParams()
@@ -101,11 +118,13 @@ export function ActivityLogsPage() {
       const response = await fetch(`/api/activity-logs?${params}`)
       if (response.ok) {
         const data = await response.json()
+        // API may return { logs: [...], total: number } or just an array
         setLogs(data.logs || data)
         if (data.total) {
           setTotalPages(Math.ceil(data.total / itemsPerPage))
         }
       } else {
+        // Show destructive toast on failure
         toast({
           title: "Error",
           description: "Failed to fetch activity logs",
@@ -122,6 +141,7 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Fetch user list for the user filter dropdown
   const fetchUsers = async () => {
     try {
       const response = await fetch("/api/users")
@@ -134,11 +154,13 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Open details dialog with selected log
   const handleViewDetails = (log: ActivityLog) => {
     setSelectedLog(log)
     setIsDetailsDialogOpen(true)
   }
 
+  // Export logs as CSV using current filters
   const exportLogs = async () => {
     try {
       const params = new URLSearchParams()
@@ -171,6 +193,7 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Helper to format timestamps into a human-friendly string
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -181,6 +204,7 @@ export function ActivityLogsPage() {
     })
   }
 
+  // Map action names to icons for display
   const getActionIcon = (action: string) => {
     switch (action.toLowerCase()) {
       case "create":
@@ -196,6 +220,7 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Map action names to Badge variants
   const getActionBadgeVariant = (action: string) => {
     switch (action.toLowerCase()) {
       case "create":
@@ -211,6 +236,7 @@ export function ActivityLogsPage() {
     }
   }
 
+  // Map entity type to a small color class for badges
   const getEntityTypeColor = (entityType: string) => {
     const colors = {
       user: "bg-blue-100 text-blue-800",
@@ -223,12 +249,13 @@ export function ActivityLogsPage() {
     return colors[entityType as keyof typeof colors] || "bg-gray-100 text-gray-800"
   }
 
-  // Calculate statistics
+  // Derived statistics for the top dashboard cards
   const totalLogs = logs.length
   const createActions = logs.filter((l) => l.action.toLowerCase() === "create").length
   const updateActions = logs.filter((l) => l.action.toLowerCase() === "update").length
   const deleteActions = logs.filter((l) => l.action.toLowerCase() === "delete").length
 
+  // Loading UI
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -238,8 +265,10 @@ export function ActivityLogsPage() {
     )
   }
 
+  // Main render
   return (
     <div className="space-y-6">
+      {/* Header with page title and actions */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Activity Logs</h2>
@@ -257,7 +286,7 @@ export function ActivityLogsPage() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Top-level statistics cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -268,6 +297,7 @@ export function ActivityLogsPage() {
             <div className="text-2xl font-bold">{totalLogs}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Created</CardTitle>
@@ -277,6 +307,7 @@ export function ActivityLogsPage() {
             <div className="text-2xl font-bold text-green-600">{createActions}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Updated</CardTitle>
@@ -286,6 +317,7 @@ export function ActivityLogsPage() {
             <div className="text-2xl font-bold text-blue-600">{updateActions}</div>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Deleted</CardTitle>
@@ -297,19 +329,21 @@ export function ActivityLogsPage() {
         </Card>
       </div>
 
+      {/* Tabs for logs and analytics */}
       <Tabs defaultValue="logs" className="space-y-4">
         <TabsList>
           <TabsTrigger value="logs">Activity Logs</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
+        {/* Logs view */}
         <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>System Activity Log</CardTitle>
               <CardDescription>Complete audit trail of all user activities and system changes</CardDescription>
 
-              {/* Filters */}
+              {/* Filters row */}
               <div className="flex items-center space-x-4 flex-wrap gap-2">
                 <div className="flex items-center space-x-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
@@ -321,6 +355,7 @@ export function ActivityLogsPage() {
                   />
                 </div>
 
+                {/* Action filter */}
                 <Select value={actionFilter} onValueChange={setActionFilter}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Action" />
@@ -334,6 +369,7 @@ export function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
 
+                {/* Entity type filter */}
                 <Select value={entityTypeFilter} onValueChange={setEntityTypeFilter}>
                   <SelectTrigger className="w-[160px]">
                     <SelectValue placeholder="Entity Type" />
@@ -349,6 +385,7 @@ export function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
 
+                {/* User filter */}
                 <Select value={userFilter} onValueChange={setUserFilter}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="User" />
@@ -363,6 +400,7 @@ export function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
 
+                {/* Date filter */}
                 <Select value={dateFilter} onValueChange={setDateFilter}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Date" />
@@ -378,6 +416,7 @@ export function ActivityLogsPage() {
             </CardHeader>
 
             <CardContent>
+              {/* Table header */}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -389,6 +428,8 @@ export function ActivityLogsPage() {
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
+
+                {/* Table body with logs */}
                 <TableBody>
                   {logs.map((log) => (
                     <TableRow key={log.id}>
@@ -398,6 +439,7 @@ export function ActivityLogsPage() {
                           <div className="text-sm">{formatDate(log.created_at)}</div>
                         </div>
                       </TableCell>
+
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-6 w-6">
@@ -411,12 +453,14 @@ export function ActivityLogsPage() {
                           <div className="text-sm">{log.user_name}</div>
                         </div>
                       </TableCell>
+
                       <TableCell>
                         <Badge variant={getActionBadgeVariant(log.action)} className="flex items-center gap-1 w-fit">
                           {getActionIcon(log.action)}
                           {log.action}
                         </Badge>
                       </TableCell>
+
                       <TableCell>
                         <div className="space-y-1">
                           <Badge className={`text-xs ${getEntityTypeColor(log.entity_type)}`}>
@@ -425,9 +469,11 @@ export function ActivityLogsPage() {
                           <div className="text-sm text-muted-foreground">{log.entity_name}</div>
                         </div>
                       </TableCell>
+
                       <TableCell>
                         <div className="text-sm max-w-md truncate">{log.description}</div>
                       </TableCell>
+
                       <TableCell>
                         <Button size="sm" variant="outline" onClick={() => handleViewDetails(log)}>
                           <Eye className="h-4 w-4" />
@@ -438,6 +484,7 @@ export function ActivityLogsPage() {
                 </TableBody>
               </Table>
 
+              {/* Empty state when there are no logs */}
               {logs.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -446,7 +493,7 @@ export function ActivityLogsPage() {
                 </div>
               )}
 
-              {/* Pagination */}
+              {/* Pagination controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
@@ -476,6 +523,7 @@ export function ActivityLogsPage() {
           </Card>
         </TabsContent>
 
+        {/* Analytics view */}
         <TabsContent value="analytics" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
@@ -546,7 +594,7 @@ export function ActivityLogsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Activity Details Dialog */}
+      {/* Details dialog to inspect a single log entry */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -628,6 +676,7 @@ export function ActivityLogsPage() {
                 </CardContent>
               </Card>
 
+              {/* Show old/new JSON values if present */}
               {(selectedLog.old_values || selectedLog.new_values) && (
                 <div className="grid gap-4 md:grid-cols-2">
                   {selectedLog.old_values && (
