@@ -72,7 +72,6 @@ export default function InventoryPageDatabase() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  //Subject to be removed later
   // Filters (following the layout/setup of the first file)
   const [filters, setFilters] = useState<ItemFilters>({
     search: "",
@@ -104,6 +103,8 @@ export default function InventoryPageDatabase() {
 
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<StockItem | null>(null)
+  
+  // editForm now includes subcategory_id and min_quantity
   const [editForm, setEditForm] = useState({
     name: "",
     description: "",
@@ -123,7 +124,7 @@ export default function InventoryPageDatabase() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchInventory(), fetchCategories(), fetchLocations()])
+      await Promise.all([fetchInventory(), fetchCategories(), fetchLocations(), fetchSuppliers()])
     } catch (error) {
       console.error("Error fetching data:", error)
     } finally {
@@ -166,6 +167,7 @@ export default function InventoryPageDatabase() {
       unit_price: Number(item.unit_price) || 0,
       min_quantity: item.min_quantity || 0,
       category_id: item.category_id || "UNSPECIFIED",
+      subcategory_id: item.subcategory_id || "UNSPECIFIED",
       location_id: item.location_id || "UNSPECIFIED",
       supplier_id: item.supplier_id || "UNSPECIFIED",
     })
@@ -199,6 +201,7 @@ export default function InventoryPageDatabase() {
       unit_price: 0,
       min_quantity: 0,
       category_id: "UNSPECIFIED",
+      subcategory_id: "UNSPECIFIED",
       location_id: "UNSPECIFIED",
       supplier_id: "UNSPECIFIED",
     })
@@ -480,6 +483,7 @@ export default function InventoryPageDatabase() {
       unit_price: item.unit_price ?? 0,
       min_quantity: item.min_quantity ?? 0,
       category_id: item.category_id ?? "",
+      subcategory_id: item.subcategory_id ?? "",
       location_id: item.location_id ?? "",
       supplier_id: item.supplier_id ?? "",
     })
