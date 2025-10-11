@@ -21,11 +21,11 @@ interface StockMovement {
   unit_price?: number | null
   total_value?: number | null
   notes?: string | null
-  location?: string | null // may be name or id depending on what the API returns
+  location?: string | null
   location_id?: string | null
   user_name?: string | null
   reference_number?: string | null
-  supplier?: string | null // may be name
+  supplier?: string | null
   supplier_id?: string | null
   customer?: string | null
   movement_date: string
@@ -71,55 +71,74 @@ export function EditMovementDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  // Helper: format ISO -> datetime-local value
+  // Convert an ISO date into the format accepted by datetime-local (YYYY-MM-DDTHH:mm)
   const toInputDateTime = (iso?: string) => {
-    if (!iso) return new Date().toISOString().slice(0, 16)
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16)
-    return d.toISOString().slice(0, 16)
+    try {
+      if (!iso) {
+        // default to local now
+        const now = new Date()
+        const tzOffsetMin = now.getTimezoneOffset()
+        const local = new Date(now.getTime() - tzOffsetMin * 60_000)
+        return local.toISOString().slice(0, 16)
+      }
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) {
+        const now = new Date()
+        const tzOffsetMin = now.getTimezoneOffset()
+        const local = new Date(now.getTime() - tzOffsetMin * 60_000)
+        return local.toISOString().slice(0, 16)
+      }
+      // convert to local representation for datetime-local
+      const tzOffsetMin = d.getTimezoneOffset()
+      const local = new Date(d.getTime() - tzOffsetMin * 60_000)
+      return local.toISOString().slice(0, 16)
+    } catch {
+      const now = new Date()
+      const tzOffsetMin = now.getTimezoneOffset()
+      const local = new Date(now.getTime() - tzOffsetMin * 60_000)
+      return local.toISOString().slice(0, 16)
+    }
   }
 
-  // Map movement's location / supplier (name or id) to ids using the provided lists
+  // When movement prop changes, map values safely into the form.
   useEffect(() => {
     if (!movement) {
       setFormData({})
       return
     }
 
-    // Determine supplier_id:
+    // Try to derive supplier_id from movement if only name provided
     let supplierId: string | undefined
     if (movement.supplier_id) {
       supplierId = String(movement.supplier_id)
     } else if (movement.supplier) {
-      // try to match by name or code
-      const match = (suppliers ?? []).find(
+      const m = (suppliers ?? []).find(
         (s) => s.id === movement.supplier || s.name === movement.supplier || (s.code && s.code === movement.supplier)
       )
-      supplierId = match?.id
+      supplierId = m?.id
     }
 
-    // Determine location_id:
+    // Try to derive location_id similarly
     let locationId: string | undefined
     if ((movement as any).location_id) {
       locationId = String((movement as any).location_id)
     } else if (movement.location) {
-      // match by id, name, or code
-      const match = (locations ?? []).find(
+      const m = (locations ?? []).find(
         (l) => l.id === movement.location || l.name === movement.location || (l.code && l.code === movement.location)
       )
-      locationId = match?.id
+      locationId = m?.id
     }
 
+    // Ensure numeric fields are numbers, not NaN
+    const q = Number(movement.quantity)
+    const unitPrice = movement.unit_price === undefined || movement.unit_price === null ? undefined : Number(movement.unit_price)
+
     setFormData({
-      // numbers are stored as numbers; ensure conversion
-      quantity: Number.isFinite(Number(movement.quantity)) ? Number(movement.quantity) : 0,
-      unit_price:
-        movement.unit_price === undefined || movement.unit_price === null
-          ? undefined
-          : Number(movement.unit_price),
+      quantity: Number.isFinite(q) ? q : 0,
+      unit_price: Number.isFinite(Number(unitPrice)) ? Number(unitPrice) : undefined,
       total_value:
-        Number.isFinite(Number(movement.quantity)) && Number.isFinite(Number(movement.unit_price || 0))
-          ? Number(movement.quantity) * Number(movement.unit_price || 0)
+        Number.isFinite(q) && Number.isFinite(Number(unitPrice))
+          ? q * Number(unitPrice)
           : movement.total_value ?? undefined,
       notes: movement.notes ?? undefined,
       location_id: locationId ?? (UNSPECIFIED as unknown as string),
@@ -131,7 +150,7 @@ export function EditMovementDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movement, (locations ?? []).length, (suppliers ?? []).length])
 
-  // Recompute total_value when quantity or unit_price changes
+  // Recompute total_value when quantity or unit_price change
   useEffect(() => {
     const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
     const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
@@ -148,35 +167,36 @@ export function EditMovementDialog({
     const newErrors: string[] = []
     const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
     if (!Number.isFinite(q) || q <= 0) newErrors.push("Quantity must be a number greater than 0")
-    // If movement is IN and a supplier is required in your domain, you could validate supplier_id here.
     setErrors(newErrors)
     return newErrors.length === 0
   }
 
-  // Build payload and call onSubmit with { id, payload }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!movement) return
     if (!validateForm()) return
 
     setIsSubmitting(true)
-
     try {
       const payload: Partial<StockMovement> = {}
 
-      // quantity (required)
+      // quantity
       const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
       if (Number.isFinite(q)) payload.quantity = q
 
-      // unit_price (optional)
-      if (formData.unit_price !== undefined && formData.unit_price !== null) {
+      // unit_price
+      if (
+        formData.unit_price !== undefined &&
+        formData.unit_price !== null &&
+        (typeof formData.unit_price !== "string" || formData.unit_price !== "")
+      ) {
         const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
         payload.unit_price = Number.isFinite(up) ? up : undefined
       } else {
         payload.unit_price = undefined
       }
 
-      // total_value (compute if possible)
+      // total_value (computed if both numeric)
       if (payload.quantity !== undefined && payload.unit_price !== undefined && Number.isFinite(payload.quantity) && Number.isFinite(payload.unit_price)) {
         payload.total_value = payload.quantity * payload.unit_price
       } else if (formData.total_value !== undefined && isFiniteNumber(formData.total_value as any)) {
@@ -185,7 +205,7 @@ export function EditMovementDialog({
         payload.total_value = undefined
       }
 
-      // reference_number, notes, customer, movement_date (strings)
+      // string fields
       const maybeStringFields = ["reference_number", "notes", "customer", "movement_date"] as const
       for (const k of maybeStringFields) {
         const v = (formData as any)[k]
@@ -197,20 +217,20 @@ export function EditMovementDialog({
         }
       }
 
-      // supplier_id and location_id: translate sentinel to undefined
-      if (formData.supplier_id && formData.supplier_id !== UNSPECIFIED) {
+      // supplier_id and location_id: pass either a string id or undefined (NOT NaN)
+      if (formData.supplier_id && String(formData.supplier_id) !== UNSPECIFIED) {
         payload.supplier_id = String(formData.supplier_id)
       } else {
         payload.supplier_id = undefined
       }
 
-      if (formData.location_id && formData.location_id !== UNSPECIFIED) {
+      if (formData.location_id && String(formData.location_id) !== UNSPECIFIED) {
         payload.location_id = String(formData.location_id)
       } else {
         payload.location_id = undefined
       }
 
-      // call up
+      // finally call parent submit with id + payload
       await onSubmit({ id: movement.id, payload })
       setErrors([])
       onOpenChange(false)
@@ -222,7 +242,6 @@ export function EditMovementDialog({
     }
   }
 
-  // small renderer helper for formatted numbers
   const displayNumber = (v: unknown, decimals = 2) => {
     if (typeof v === "number" && Number.isFinite(v)) return v.toFixed(decimals)
     const n = Number(v as any)
@@ -289,9 +308,7 @@ export function EditMovementDialog({
           {isFiniteNumber(formData.total_value as any) && (
             <div className="space-y-2">
               <Label>Total Value</Label>
-              <div className="text-2xl font-bold text-green-600">
-                ${displayNumber(formData.total_value as any, 2)}
-              </div>
+              <div className="text-2xl font-bold text-green-600">${displayNumber(formData.total_value as any, 2)}</div>
             </div>
           )}
 
