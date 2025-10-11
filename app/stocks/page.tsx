@@ -66,11 +66,13 @@ export default function InventoryPageDatabase() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loadingSuppliers, setLoadingSuppliers] = useState(false)
   
+  //Subject to be removed later
   const [searchTerm, setSearchTerm] = useState("")
   const [locationFilter, setLocationFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
+  //Subject to be removed later
   // Filters (following the layout/setup of the first file)
   const [filters, setFilters] = useState<ItemFilters>({
     search: "",
@@ -109,6 +111,7 @@ export default function InventoryPageDatabase() {
     unit_price: 0,
     min_quantity: 0,
     category_id: "", // kept empty string for placeholder
+    subcategory_id: "", // kept empty string for placeholder
     location_id: "",
     supplier_id: "",
   })
