@@ -853,7 +853,7 @@ export default function MovementsPage() {
         suppliers={suppliers}
       />
 
-        // Only render details/edit dialogs if a movement is selected
+
       {selectedMovement && (
         <>
           <MovementDetailsDialog
