@@ -2,7 +2,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,12 +53,18 @@ interface EditMovementDialogProps {
   onSubmit: (data: { id: number | string; payload: Partial<StockMovement> }) => Promise<void> | void
 }
 
-const UNSPECIFIED = "UNSPECIFIED" // non-empty sentinel for Select components
+const UNSPECIFIED = "UNSPECIFIED" // sentinel used for the Selects
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v)
 }
 
+/**
+ * EditMovementDialog
+ * - Safe mapping of movement.location / movement.supplier to ids using lists
+ * - If a current supplier/location isn't present in the lists, it is shown as a temporary SelectItem
+ * - When submitting, we only send IDs that exist in the provided lists (prevents invalid UUIDs)
+ */
 export function EditMovementDialog({
   open,
   onOpenChange,
@@ -71,78 +77,61 @@ export function EditMovementDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  // Convert an ISO date into the format accepted by datetime-local (YYYY-MM-DDTHH:mm)
+  // format ISO -> datetime-local (YYYY-MM-DDTHH:mm)
   const toInputDateTime = (iso?: string) => {
-    try {
-      if (!iso) {
-        // default to local now
-        const now = new Date()
-        const tzOffsetMin = now.getTimezoneOffset()
-        const local = new Date(now.getTime() - tzOffsetMin * 60_000)
-        return local.toISOString().slice(0, 16)
-      }
-      const d = new Date(iso)
-      if (isNaN(d.getTime())) {
-        const now = new Date()
-        const tzOffsetMin = now.getTimezoneOffset()
-        const local = new Date(now.getTime() - tzOffsetMin * 60_000)
-        return local.toISOString().slice(0, 16)
-      }
-      // convert to local representation for datetime-local
-      const tzOffsetMin = d.getTimezoneOffset()
-      const local = new Date(d.getTime() - tzOffsetMin * 60_000)
-      return local.toISOString().slice(0, 16)
-    } catch {
+    if (!iso) {
       const now = new Date()
-      const tzOffsetMin = now.getTimezoneOffset()
-      const local = new Date(now.getTime() - tzOffsetMin * 60_000)
+      const tz = now.getTimezoneOffset()
+      const local = new Date(now.getTime() - tz * 60_000)
       return local.toISOString().slice(0, 16)
     }
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) {
+      const now = new Date()
+      const tz = now.getTimezoneOffset()
+      const local = new Date(now.getTime() - tz * 60_000)
+      return local.toISOString().slice(0, 16)
+    }
+    const tz = d.getTimezoneOffset()
+    const local = new Date(d.getTime() - tz * 60_000)
+    return local.toISOString().slice(0, 16)
   }
 
-  // When movement prop changes, map values safely into the form.
+  // Helper to try finding an id in list by id/name/code
+  const findIdInList = <T extends { id: string; name?: string; code?: string }>(list: T[] | undefined, value?: string | null) => {
+    if (!list || !value) return undefined
+    const v = String(value)
+    return list.find((x) => x.id === v || x.name === v || (x.code && x.code === v))?.id
+  }
+
+  // initialize formData when movement arrives (or when lists change)
   useEffect(() => {
     if (!movement) {
       setFormData({})
       return
     }
 
-    // Try to derive supplier_id from movement if only name provided
-    let supplierId: string | undefined
-    if (movement.supplier_id) {
-      supplierId = String(movement.supplier_id)
-    } else if (movement.supplier) {
-      const m = (suppliers ?? []).find(
-        (s) => s.id === movement.supplier || s.name === movement.supplier || (s.code && s.code === movement.supplier)
-      )
-      supplierId = m?.id
-    }
+    // derive supplier id (try supplier_id, then supplier name/code)
+    const matchedSupplierId = movement.supplier_id ? String(movement.supplier_id) : findIdInList(suppliers, movement.supplier)
 
-    // Try to derive location_id similarly
-    let locationId: string | undefined
-    if ((movement as any).location_id) {
-      locationId = String((movement as any).location_id)
-    } else if (movement.location) {
-      const m = (locations ?? []).find(
-        (l) => l.id === movement.location || l.name === movement.location || (l.code && l.code === movement.location)
-      )
-      locationId = m?.id
-    }
+    // derive location id (try location_id, then location name/code)
+    const matchedLocationId = (movement as any).location_id ? String((movement as any).location_id) : findIdInList(locations, movement.location)
 
-    // Ensure numeric fields are numbers, not NaN
+    // numeric safety
     const q = Number(movement.quantity)
-    const unitPrice = movement.unit_price === undefined || movement.unit_price === null ? undefined : Number(movement.unit_price)
+    const up = movement.unit_price === undefined || movement.unit_price === null ? undefined : Number(movement.unit_price)
 
     setFormData({
       quantity: Number.isFinite(q) ? q : 0,
-      unit_price: Number.isFinite(Number(unitPrice)) ? Number(unitPrice) : undefined,
+      unit_price: Number.isFinite(Number(up)) ? Number(up) : undefined,
       total_value:
-        Number.isFinite(q) && Number.isFinite(Number(unitPrice))
-          ? q * Number(unitPrice)
+        Number.isFinite(q) && Number.isFinite(Number(up))
+          ? q * Number(up)
           : movement.total_value ?? undefined,
       notes: movement.notes ?? undefined,
-      location_id: locationId ?? (UNSPECIFIED as unknown as string),
-      supplier_id: supplierId ?? (UNSPECIFIED as unknown as string),
+      // If we could match an id, use it. If not, but movement provides a string, keep that string as "current" value so we can show it
+      location_id: matchedLocationId ?? (movement.location ? String(movement.location) : UNSPECIFIED),
+      supplier_id: matchedSupplierId ?? (movement.supplier ? String(movement.supplier) : UNSPECIFIED),
       reference_number: movement.reference_number ?? undefined,
       customer: movement.customer ?? undefined,
       movement_date: toInputDateTime(movement.movement_date),
@@ -150,7 +139,7 @@ export function EditMovementDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movement, (locations ?? []).length, (suppliers ?? []).length])
 
-  // Recompute total_value when quantity or unit_price change
+  // recompute total_value when quantity or unit_price change
   useEffect(() => {
     const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
     const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
@@ -184,19 +173,15 @@ export function EditMovementDialog({
       const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
       if (Number.isFinite(q)) payload.quantity = q
 
-      // unit_price
-      if (
-        formData.unit_price !== undefined &&
-        formData.unit_price !== null &&
-        (typeof formData.unit_price !== "string" || formData.unit_price !== "")
-      ) {
+      // unit_price (optional)
+      if (formData.unit_price !== undefined && formData.unit_price !== null && formData.unit_price !== "") {
         const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
         payload.unit_price = Number.isFinite(up) ? up : undefined
       } else {
         payload.unit_price = undefined
       }
 
-      // total_value (computed if both numeric)
+      // total_value computed if possible
       if (payload.quantity !== undefined && payload.unit_price !== undefined && Number.isFinite(payload.quantity) && Number.isFinite(payload.unit_price)) {
         payload.total_value = payload.quantity * payload.unit_price
       } else if (formData.total_value !== undefined && isFiniteNumber(formData.total_value as any)) {
@@ -205,7 +190,7 @@ export function EditMovementDialog({
         payload.total_value = undefined
       }
 
-      // string fields
+      // string fields: reference_number, notes, customer, movement_date
       const maybeStringFields = ["reference_number", "notes", "customer", "movement_date"] as const
       for (const k of maybeStringFields) {
         const v = (formData as any)[k]
@@ -217,20 +202,18 @@ export function EditMovementDialog({
         }
       }
 
-      // supplier_id and location_id: pass either a string id or undefined (NOT NaN)
-      if (formData.supplier_id && String(formData.supplier_id) !== UNSPECIFIED) {
-        payload.supplier_id = String(formData.supplier_id)
-      } else {
-        payload.supplier_id = undefined
-      }
+      // supplier_id & location_id: ensure they correspond to known IDs from lists before sending
+      const locationCandidate = formData.location_id ? String(formData.location_id) : undefined
+      const supplierCandidate = formData.supplier_id ? String(formData.supplier_id) : undefined
 
-      if (formData.location_id && String(formData.location_id) !== UNSPECIFIED) {
-        payload.location_id = String(formData.location_id)
-      } else {
-        payload.location_id = undefined
-      }
+      const matchedLocation = locations?.find((l) => l.id === locationCandidate)
+      const matchedSupplier = suppliers?.find((s) => s.id === supplierCandidate)
 
-      // finally call parent submit with id + payload
+      // Only set id fields when we matched them to list items (prevents sending raw names or unknown strings as UUIDs)
+      payload.location_id = matchedLocation ? matchedLocation.id : undefined
+      payload.supplier_id = matchedSupplier ? matchedSupplier.id : undefined
+
+      // call parent handler
       await onSubmit({ id: movement.id, payload })
       setErrors([])
       onOpenChange(false)
@@ -248,6 +231,12 @@ export function EditMovementDialog({
     if (Number.isFinite(n)) return n.toFixed(decimals)
     return null
   }
+
+  // Determine if the current formData location_id/supplier_id exists in the provided lists.
+  const currentLocationId = formData.location_id && formData.location_id !== UNSPECIFIED ? String(formData.location_id) : null
+  const currentSupplierId = formData.supplier_id && formData.supplier_id !== UNSPECIFIED ? String(formData.supplier_id) : null
+  const locationExists = locations?.some((l) => l.id === currentLocationId)
+  const supplierExists = suppliers?.some((s) => s.id === currentSupplierId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -334,6 +323,15 @@ export function EditMovementDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={UNSPECIFIED}>Unspecified</SelectItem>
+
+                  {/* If the current location id isn't present in the list but we have a movement.location string,
+                      display it as a temporary option so the user sees the current value. */}
+                  {!locationExists && currentLocationId && movement?.location && (
+                    <SelectItem value={currentLocationId}>
+                      {movement.location}
+                    </SelectItem>
+                  )}
+
                   {(locations ?? []).length === 0 ? (
                     <SelectItem value="NO_LOCATION" disabled>
                       No locations available
@@ -372,6 +370,12 @@ export function EditMovementDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={UNSPECIFIED}>Unspecified</SelectItem>
+
+                  {/* Show current supplier string as a temporary option if not in list */}
+                  {!supplierExists && currentSupplierId && movement?.supplier && (
+                    <SelectItem value={currentSupplierId}>{movement.supplier}</SelectItem>
+                  )}
+
                   {(suppliers ?? []).length === 0 ? (
                     <SelectItem value="NO_SUPPLIER" disabled>
                       No suppliers available
