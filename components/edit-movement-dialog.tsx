@@ -112,10 +112,10 @@ export function EditMovementDialog({
     }
 
     // derive supplier id (try supplier_id, then supplier name/code)
-    const matchedSupplierId = movement.supplier_id ? String(movement.supplier_id) : findIdInList(suppliers, movement.supplier)
+    const matchedSupplierId = movement.supplier_id ? String(movement.supplier_id) : findIdInList(suppliers ?? undefined, movement.supplier)
 
     // derive location id (try location_id, then location name/code)
-    const matchedLocationId = (movement as any).location_id ? String((movement as any).location_id) : findIdInList(locations, movement.location)
+    const matchedLocationId = (movement as any).location_id ? String((movement as any).location_id) : findIdInList(locations ?? undefined, movement.location)
 
     // numeric safety
     const q = Number(movement.quantity)
@@ -174,7 +174,11 @@ export function EditMovementDialog({
       if (Number.isFinite(q)) payload.quantity = q
 
       // unit_price (optional)
-      if (formData.unit_price !== undefined && formData.unit_price !== null && formData.unit_price !== "") {
+      if (
+        formData.unit_price !== undefined &&
+        formData.unit_price !== null &&
+        String(formData.unit_price) !== ""
+      ) {
         const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
         payload.unit_price = Number.isFinite(up) ? up : undefined
       } else {
