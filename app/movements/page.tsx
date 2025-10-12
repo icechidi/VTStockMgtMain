@@ -853,6 +853,7 @@ export default function MovementsPage() {
         suppliers={suppliers}
       />
 
+
       {selectedMovement && (
         <>
           <MovementDetailsDialog
@@ -871,7 +872,25 @@ export default function MovementsPage() {
               ...selectedMovement,
               created_at: selectedMovement.created_at ?? "",
             }}
-            onSubmit={(data) => handleEditMovement(selectedMovement.id, data)}
+            // PASS the lists so the dialog can match id↔name properly
+            locations={locations}
+            suppliers={suppliers}
+            // Wrapper to adapt EditMovementDialog's payload { id, payload } -> handleEditMovement(id, payload)
+            onSubmit={async (dataObj) => {
+              try {
+                // dataObj is expected to be { id, payload } (this is how EditMovementDialog calls it)
+                const idFromDialog = (dataObj && (dataObj as any).id) ?? selectedMovement.id
+                const payload = (dataObj && (dataObj as any).payload) ?? (dataObj as any)
+
+                // ensure id is number (your handleEditMovement expects number)
+                const idNum = typeof idFromDialog === "number" ? idFromDialog : Number(idFromDialog)
+
+                // call your handler
+                await handleEditMovement(idNum, payload as Partial<StockMovement>)
+              } catch (err) {
+                console.error("Wrapper onSubmit error:", err)
+              }
+            }}
           />
         </>
       )}
