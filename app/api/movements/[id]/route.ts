@@ -1,55 +1,88 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query, getClient } from "@/lib/database"
 
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function normalizeIdParam(rawId: string) {
+  if (!rawId) return null
+  // If it looks like a UUID, return it as-is
+  if (UUID_V4_REGEX.test(rawId)) return rawId
+  // If it's a plain integer string, parse to number
+  if (/^\d+$/.test(rawId)) return Number.parseInt(rawId, 10)
+  // Otherwise invalid
+  return null
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const client = await getClient()
 
   try {
     await client.query("BEGIN")
 
-    const id = Number.parseInt(params.id)
+    const rawId = params.id
+    const id = normalizeIdParam(rawId)
+
+    if (id === null || id === undefined) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Invalid movement id" }, { status: 400 })
+    }
+
     const body = await request.json()
 
-    // Get current movement data
+    // Get current movement data (use the appropriate type for the id param)
     const currentResult = await client.query("SELECT * FROM stock_movements WHERE id = $1", [id])
-
     if (currentResult.rows.length === 0) {
+      await client.query("ROLLBACK")
       return NextResponse.json({ error: "Movement not found" }, { status: 404 })
     }
 
-    const currentMovement = currentResult.rows[0]
-
-    // Update movement (this will trigger the stock update via trigger)
-    const updateFields = []
-    const updateValues = []
+    // Build update statement from body keys
+    const updateFields: string[] = []
+    const updateValues: any[] = []
     let paramCount = 1
 
     Object.entries(body).forEach(([key, value]) => {
-      if (value !== undefined && key !== "id") {
-        updateFields.push(`${key} = $${paramCount}`)
-        updateValues.push(value)
-        paramCount++
-      }
+      if (value === undefined || key === "id") return
+
+      // Defensive: if client sent sentinel values like "UNSPECIFIED", treat them as null
+      // (You may prefer to handle this at client-side, but server-side guard is safe.)
+      const sanitizedValue = value === "UNSPECIFIED" ? null : value
+
+      updateFields.push(`${key} = $${paramCount}`)
+      updateValues.push(sanitizedValue)
+      paramCount++
     })
 
     if (updateFields.length === 0) {
+      await client.query("ROLLBACK")
       return NextResponse.json({ error: "No fields to update" }, { status: 400 })
     }
 
+    // Add updated_at (no placeholder needed)
     updateFields.push(`updated_at = CURRENT_TIMESTAMP`)
+
+    // Append id as last parameter for the WHERE clause
     updateValues.push(id)
 
     const updateQuery = `
-      UPDATE stock_movements 
+      UPDATE stock_movements
       SET ${updateFields.join(", ")}
       WHERE id = $${paramCount}
       RETURNING *
     `
 
-    await client.query(updateQuery, updateValues)
+    const updateResult = await client.query(updateQuery, updateValues)
+
+    // If the update didn't return anything, treat as not found / something went wrong
+    if (updateResult.rows.length === 0) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Failed to update movement (no rows returned)" }, { status: 500 })
+    }
+
     await client.query("COMMIT")
 
-    // Get the complete updated movement
+    // Re-select the full movement with joins (use helper `query` so you reuse your pool wrapper)
     const movementResult = await query(
       `
       SELECT 
@@ -79,10 +112,19 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       [id],
     )
 
+    if (!movementResult || movementResult.rows.length === 0) {
+      // This is unexpected but handle gracefully
+      return NextResponse.json(updateResult.rows[0])
+    }
+
     return NextResponse.json(movementResult.rows[0])
   } catch (error) {
-    await client.query("ROLLBACK")
-    console.error("Database error:", error)
+    try {
+      await client.query("ROLLBACK")
+    } catch (e) {
+      // ignore
+    }
+    console.error("Database error in PUT /api/movements/[id]:", error)
     return NextResponse.json({ error: "Failed to update movement" }, { status: 500 })
   } finally {
     client.release()
@@ -95,19 +137,30 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     await client.query("BEGIN")
 
-    const id = Number.parseInt(params.id)
+    const rawId = params.id
+    const id = normalizeIdParam(rawId)
+
+    if (id === null || id === undefined) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Invalid movement id" }, { status: 400 })
+    }
 
     const result = await client.query("DELETE FROM stock_movements WHERE id = $1 RETURNING *", [id])
 
     if (result.rows.length === 0) {
+      await client.query("ROLLBACK")
       return NextResponse.json({ error: "Movement not found" }, { status: 404 })
     }
 
     await client.query("COMMIT")
     return NextResponse.json({ success: true })
   } catch (error) {
-    await client.query("ROLLBACK")
-    console.error("Database error:", error)
+    try {
+      await client.query("ROLLBACK")
+    } catch (e) {
+      // ignore
+    }
+    console.error("Database error in DELETE /api/movements/[id]:", error)
     return NextResponse.json({ error: "Failed to delete movement" }, { status: 500 })
   } finally {
     client.release()
