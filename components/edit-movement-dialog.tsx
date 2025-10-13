@@ -21,11 +21,11 @@ interface StockMovement {
   unit_price?: number | null
   total_value?: number | null
   notes?: string | null
-  location?: string | null // may be name or id depending on what the API returns
+  location?: string | null
   location_id?: string | null
   user_name?: string | null
   reference_number?: string | null
-  supplier?: string | null // may be name
+  supplier?: string | null
   supplier_id?: string | null
   customer?: string | null
   movement_date: string
@@ -44,23 +44,23 @@ interface Supplier {
   code?: string
 }
 
-/** Props from parent */
 interface EditMovementDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   movement: StockMovement | null
   locations?: Location[] | any | null
   suppliers?: Supplier[] | any | null
-  onSubmit: (data: { id: number | string; payload: Partial<StockMovement> }) => Promise<void> | void
+  // <-- IMPORTANT: parent (MovementsPage) expects this to receive the payload only
+  onSubmit: (payload: Partial<StockMovement>) => Promise<void> | void
 }
 
-const UNSPECIFIED = "UNSPECIFIED" // non-empty sentinel for Select components
+const UNSPECIFIED = "UNSPECIFIED" // sentinel value for Select components
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v)
 }
 
-/** normalize helper - handles arrays or objects with rows/data */
+/** Normalize various API shapes into an array */
 function normalizeArray<T = any>(maybeArray: any): T[] {
   if (!maybeArray) return []
   if (Array.isArray(maybeArray)) return maybeArray
@@ -68,7 +68,7 @@ function normalizeArray<T = any>(maybeArray: any): T[] {
     if (Array.isArray(maybeArray.rows)) return maybeArray.rows
     if (Array.isArray(maybeArray.data)) return maybeArray.data
     if (Array.isArray(maybeArray.items)) return maybeArray.items
-    // sometimes APIs wrap inside a key like { suppliers: [...] }
+    // sometimes API returns { suppliers: [...] } or similar
     const keys = Object.keys(maybeArray)
     for (const k of keys) {
       if (Array.isArray((maybeArray as any)[k])) return (maybeArray as any)[k]
@@ -89,53 +89,57 @@ export function EditMovementDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  // Normalized arrays (defensive)
+  // defensive normalization
   const locationsList = normalizeArray<Location>(locations)
   const suppliersList = normalizeArray<Supplier>(suppliers)
 
-  // Helper: format ISO -> datetime-local value
+  // Helper: convert ISO => value for datetime-local input
   const toInputDateTime = (iso?: string) => {
     if (!iso) return new Date().toISOString().slice(0, 16)
     const d = new Date(iso)
     if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16)
+    // use slice(0,16) so the value is "YYYY-MM-DDTHH:mm"
     return d.toISOString().slice(0, 16)
   }
 
-  // Map movement's location / supplier (name or id) to ids using the provided lists
+  // populate form when movement or supporting lists change
   useEffect(() => {
     if (!movement) {
       setFormData({})
       return
     }
 
-    // Determine supplier_id:
+    // attempt to find supplier_id from suppliersList if only name/code is on movement
     let supplierId: string | undefined
     if (movement.supplier_id) {
       supplierId = String(movement.supplier_id)
     } else if (movement.supplier) {
-      // try to match by id (string), name or code
       const match =
         suppliersList.find(
-          (s) => String(s.id) === String(movement.supplier) || s.name === movement.supplier || (s.code && s.code === movement.supplier),
+          (s) =>
+            String(s.id) === String(movement.supplier) ||
+            s.name === movement.supplier ||
+            (s.code && s.code === movement.supplier),
         ) ?? undefined
       supplierId = match?.id
     }
 
-    // Determine location_id:
+    // attempt to find location_id similarly
     let locationId: string | undefined
     if ((movement as any).location_id) {
       locationId = String((movement as any).location_id)
     } else if (movement.location) {
-      // match by id, name, or code
       const match =
         locationsList.find(
-          (l) => String(l.id) === String(movement.location) || l.name === movement.location || (l.code && l.code === movement.location),
+          (l) =>
+            String(l.id) === String(movement.location) ||
+            l.name === movement.location ||
+            (l.code && l.code === movement.location),
         ) ?? undefined
       locationId = match?.id
     }
 
     setFormData({
-      // numbers are stored as numbers; ensure conversion
       quantity: Number.isFinite(Number(movement.quantity)) ? Number(movement.quantity) : 0,
       unit_price:
         movement.unit_price === undefined || movement.unit_price === null
@@ -155,7 +159,7 @@ export function EditMovementDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movement, locationsList.length, suppliersList.length])
 
-  // Recompute total_value when quantity or unit_price changes
+  // recompute total_value any time qty or unit_price changes
   useEffect(() => {
     const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
     const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
@@ -176,22 +180,21 @@ export function EditMovementDialog({
     return newErrors.length === 0
   }
 
-  // Build payload and call onSubmit with { id, payload }
+  // When submitting, build the payload and call onSubmit(payload)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!movement) return
     if (!validateForm()) return
 
     setIsSubmitting(true)
-
     try {
       const payload: Partial<StockMovement> = {}
 
-      // quantity (required)
+      // quantity
       const q = typeof formData.quantity === "number" ? formData.quantity : Number(formData.quantity)
       if (Number.isFinite(q)) payload.quantity = q
 
-      // unit_price (optional)
+      // unit_price
       if (formData.unit_price !== undefined && formData.unit_price !== null) {
         const up = typeof formData.unit_price === "number" ? formData.unit_price : Number(formData.unit_price as any)
         payload.unit_price = Number.isFinite(up) ? up : undefined
@@ -199,7 +202,7 @@ export function EditMovementDialog({
         payload.unit_price = undefined
       }
 
-      // total_value (compute if possible)
+      // total_value (computed if possible)
       if (payload.quantity !== undefined && payload.unit_price !== undefined && Number.isFinite(payload.quantity) && Number.isFinite(payload.unit_price)) {
         payload.total_value = payload.quantity * payload.unit_price
       } else if (formData.total_value !== undefined && isFiniteNumber(formData.total_value as any)) {
@@ -208,7 +211,7 @@ export function EditMovementDialog({
         payload.total_value = undefined
       }
 
-      // reference_number, notes, customer, movement_date (strings)
+      // simple string fields
       const maybeStringFields = ["reference_number", "notes", "customer", "movement_date"] as const
       for (const k of maybeStringFields) {
         const v = (formData as any)[k]
@@ -220,7 +223,7 @@ export function EditMovementDialog({
         }
       }
 
-      // supplier_id and location_id: translate sentinel to undefined
+      // supplier_id & location_id sentinel handling
       if (formData.supplier_id && formData.supplier_id !== UNSPECIFIED) {
         payload.supplier_id = String(formData.supplier_id)
       } else {
@@ -233,8 +236,9 @@ export function EditMovementDialog({
         payload.location_id = undefined
       }
 
-      // call up
-      await onSubmit({ id: movement.id, payload })
+      // IMPORTANT: call parent with payload only (parent adds the ID)
+      await onSubmit(payload)
+
       setErrors([])
       onOpenChange(false)
     } catch (err) {
@@ -245,7 +249,6 @@ export function EditMovementDialog({
     }
   }
 
-  // small renderer helper for formatted numbers
   const displayNumber = (v: unknown, decimals = 2) => {
     if (typeof v === "number" && Number.isFinite(v)) return v.toFixed(decimals)
     const n = Number(v as any)
@@ -253,7 +256,7 @@ export function EditMovementDialog({
     return null
   }
 
-  // defensive checks for existence of selected ids in normalized lists
+  // checks for helpful hints if selected ids are not in lists
   const currentLocationId = formData.location_id && formData.location_id !== UNSPECIFIED ? String(formData.location_id) : null
   const currentSupplierId = formData.supplier_id && formData.supplier_id !== UNSPECIFIED ? String(formData.supplier_id) : null
   const locationExists = locationsList && locationsList.length > 0 ? locationsList.some((l) => String(l.id) === currentLocationId) : false
@@ -318,9 +321,7 @@ export function EditMovementDialog({
           {isFiniteNumber(formData.total_value as any) && (
             <div className="space-y-2">
               <Label>Total Value</Label>
-              <div className="text-2xl font-bold text-green-600">
-                ${displayNumber(formData.total_value as any, 2)}
-              </div>
+              <div className="text-2xl font-bold text-green-600">${displayNumber(formData.total_value as any, 2)}</div>
             </div>
           )}
 
@@ -337,10 +338,7 @@ export function EditMovementDialog({
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Select
-                value={(formData.location_id ?? UNSPECIFIED) as string}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, location_id: value }))}
-              >
+              <Select value={(formData.location_id ?? UNSPECIFIED) as string} onValueChange={(value) => setFormData((prev) => ({ ...prev, location_id: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
@@ -359,7 +357,6 @@ export function EditMovementDialog({
                   )}
                 </SelectContent>
               </Select>
-              {/* show helpful hint if selected id is not in the list */}
               {!locationExists && formData.location_id && formData.location_id !== UNSPECIFIED && (
                 <div className="text-xs text-muted-foreground">Selected location is not in the current list</div>
               )}
@@ -368,21 +365,13 @@ export function EditMovementDialog({
 
           <div className="space-y-2">
             <Label htmlFor="reference_number">Reference Number</Label>
-            <Input
-              id="reference_number"
-              value={formData.reference_number ?? ""}
-              onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-              placeholder="PO#, Invoice#, etc."
-            />
+            <Input id="reference_number" value={formData.reference_number ?? ""} onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })} placeholder="PO#, Invoice#, etc." />
           </div>
 
           {movement?.movement_type === "IN" ? (
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier</Label>
-              <Select
-                value={(formData.supplier_id ?? UNSPECIFIED) as string}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, supplier_id: value }))}
-              >
+              <Select value={(formData.supplier_id ?? UNSPECIFIED) as string} onValueChange={(value) => setFormData((prev) => ({ ...prev, supplier_id: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
@@ -408,24 +397,13 @@ export function EditMovementDialog({
           ) : (
             <div className="space-y-2">
               <Label htmlFor="customer">Customer/Department</Label>
-              <Input
-                id="customer"
-                value={formData.customer ?? ""}
-                onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
-                placeholder="Customer or department name"
-              />
+              <Input id="customer" value={formData.customer ?? ""} onChange={(e) => setFormData({ ...formData, customer: e.target.value })} placeholder="Customer or department name" />
             </div>
           )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes ?? ""}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Additional notes about this movement"
-              rows={3}
-            />
+            <Textarea id="notes" value={formData.notes ?? ""} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Additional notes about this movement" rows={3} />
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
