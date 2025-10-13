@@ -267,9 +267,31 @@ export default function MovementsPage() {
     }
   }
 
-  const handleEditMovement = async (id: number, movementData: Partial<StockMovement>) => {
+  // safer, tolerant edit handler - NEWLY ADDED.....................
+  const handleEditMovement = async (
+    id: string | number | undefined | null,
+    movementData: Partial<StockMovement>
+  ) => {
+    // Defensive checks
+    if (id === null || id === undefined) {
+      console.error("handleEditMovement called without an id", { id, movementData })
+      toast({ title: "Error", description: "Missing movement id", variant: "destructive" })
+      return
+    }
+
+    const idStr = String(id)
+    // Catch obvious bad values
+    if (idStr.trim() === "" || idStr === "NaN") {
+      console.error("Invalid movement id:", id, "->", idStr)
+      toast({ title: "Error", description: "Invalid movement id", variant: "destructive" })
+      return
+    }
+
     try {
-      const response = await fetch(`/api/movements/${id}`, {
+      // helpful console log for debugging
+      console.log("Updating movement ->", `/api/movements/${idStr}`, movementData)
+
+      const response = await fetch(`/api/movements/${encodeURIComponent(idStr)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(movementData),
@@ -277,11 +299,14 @@ export default function MovementsPage() {
 
       if (response.ok) {
         const updatedMovement = await response.json()
-        setMovements(movements.map((m) => (m.id === id ? updatedMovement : m)))
+        setMovements((prev) => prev.map((m) => (m.id === updatedMovement.id ? updatedMovement : m)))
         setShowEditDialog(false)
         setSelectedMovement(null)
         toast({ title: "Success", description: "Movement updated successfully" })
       } else {
+        // surface server error
+        const txt = await response.text().catch(() => null)
+        console.error("Failed to update movement:", response.status, txt)
         throw new Error("Failed to update movement")
       }
     } catch (error) {
@@ -290,8 +315,9 @@ export default function MovementsPage() {
     }
   }
 
-  const handleDeleteMovement = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this movement? This action cannot be undone.")) return
+// delete movement
+const handleDeleteMovement = async (id: number) => {
+  if (!confirm("Are you sure you want to delete this movement? This action cannot be undone.")) return
 
     try {
       const response = await fetch(`/api/movements/${id}`, { method: "DELETE" })
@@ -879,16 +905,43 @@ export default function MovementsPage() {
             onSubmit={async (dataObj) => {
               try {
                 // dataObj is expected to be { id, payload } (this is how EditMovementDialog calls it)
-                const idFromDialog = (dataObj && (dataObj as any).id) ?? selectedMovement.id
-                const payload = (dataObj && (dataObj as any).payload) ?? (dataObj as any)
+                const idFromDialog = dataObj && (dataObj as any).id !== undefined ? (dataObj as any).id : selectedMovement?.id
+                const payload = dataObj && (dataObj as any).payload !== undefined ? (dataObj as any).payload : (dataObj as any)
 
-                // ensure id is number (your handleEditMovement expects number)
-                const idNum = typeof idFromDialog === "number" ? idFromDialog : Number(idFromDialog)
+                // Validate presence
+                if (idFromDialog === null || idFromDialog === undefined) {
+                  console.error("EditMovementDialog.onSubmit: missing id", { idFromDialog, payload })
+                  toast({
+                    title: "Update failed",
+                    description: "Missing movement id. Please try again.",
+                    variant: "destructive",
+                  })
+                  return
+                }
 
-                // call your handler
+                // Convert to number (your handleEditMovement expects a number)
+                const idNum = Number(idFromDialog)
+
+                // Validate numeric id
+                if (!Number.isFinite(idNum) || idNum <= 0) {
+                  console.error("EditMovementDialog.onSubmit: invalid id", { idFromDialog, idNum })
+                  toast({
+                    title: "Update failed",
+                    description: "Invalid movement id. Please try again.",
+                    variant: "destructive",
+                  })
+                  return
+                }
+
+                // Call your handler
                 await handleEditMovement(idNum, payload as Partial<StockMovement>)
               } catch (err) {
                 console.error("Wrapper onSubmit error:", err)
+                toast({
+                  title: "Update failed",
+                  description: "An unexpected error occurred while updating the movement.",
+                  variant: "destructive",
+                })
               }
             }}
           />
