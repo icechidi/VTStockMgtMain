@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, AlertTriangle, TrendingUp, TrendingDown, BadgeAlert } from "lucide-react"
 
@@ -106,19 +107,42 @@ export function DashboardStats() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {statCards.map((card, index) => (
-        <Card key={index} className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-            <div className={`p-2 rounded-full ${card.bgColor}`}>
-              <card.icon className={`h-4 w-4 ${card.color}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{card.value}</div>
-          </CardContent>
-        </Card>
-      ))}
+      {statCards.map((card, index) => {
+        const Icon = card.icon
+        const cardInner = (
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+              <div className={`p-2 rounded-full ${card.bgColor}`}>
+                <Icon className={`h-4 w-4 ${card.color}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{card.value}</div>
+            </CardContent>
+          </Card>
+        )
+
+        // Make the Low Stock card clickable and link to the lowstock section on the stock page
+        if (card.title === "Low Stock Items") {
+          return (
+            <Link
+              href="/stock#lowstock"
+              key={index}
+              className="no-underline"
+              aria-label="View low stock items"
+            >
+              <div className="cursor-pointer">{cardInner}</div>
+            </Link>
+          )
+        }
+
+        return (
+          <div key={index}>
+            {cardInner}
+          </div>
+        )
+      })}
     </div>
   )
 }
