@@ -490,64 +490,6 @@ export default function InventoryPageDatabase() {
     setIsEditOpen(true)
   }
 
-  // const submitEdit = async () => {
-  //   if (!editingItem) return
-  //   const payload = {
-  //     name: editForm.name,
-  //     description: editForm.description,
-  //     quantity: Number(editForm.quantity),
-  //     unit_price: Number(editForm.unit_price),
-  //     min_quantity: Number(editForm.min_quantity),
-  //     // convert unspecified/placeholder to null for backend
-  //     category_id: editForm.category_id && editForm.category_id !== "UNSPECIFIED" ? editForm.category_id : null,
-  //     location_id: editForm.location_id && editForm.location_id !== "UNSPECIFIED" ? editForm.location_id : null,
-  //     supplier_id: editForm.supplier_id === "UNSPECIFIED" ? null : editForm.supplier_id,
-  //     status
-  //     :
-  //       Number(editForm.quantity) === 0
-  //         ? "out_of_stock"
-  //         : Number(editForm.min_quantity) && Number(editForm.quantity) < Number(editForm.min_quantity)
-  //         ? "low_stock"
-  //         : "in_stock",
-  //   }
-  //   try {
-  //     const response = await fetch(`/api/stock-items/${editingItem.id}`, {
-  //       method: "PUT",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     })
-  //     if (!res.ok) {
-  //       const err = await res.json().catch(() => null)
-  //       toast({
-  //         title: "Update failed",
-  //         description: err?.error || "Failed to update item",
-  //         variant: "destructive",
-  //       })
-  //       return
-  //     }
-
-  //     const updated = await res.json()
-
-  //     // update local items array
-  //     setItems((prev) => prev.map((it) => (String(it.id) === String(updated.id) ? updated : it)))
-
-  //     // update currently editing item + close modal
-  //     setEditingItem(updated)
-  //     toast({
-  //       title: "Saved",
-  //       description: "Item updated successfully",
-  //     })
-  //     closeEdit()
-  //   } catch (err) {
-  //     console.error("Error updating item:", err)
-  //     toast({
-  //       title: "Update failed",
-  //       description: "An unexpected error occurred",
-  //       variant: "destructive",
-  //     })
-  //   }
-  // }
-
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return
@@ -630,11 +572,41 @@ export default function InventoryPageDatabase() {
       </div>
 
       {/* TOP Analytics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Total Items</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.length}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Total Value</CardTitle><BarChart3 className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold">${inventory.reduce((sum,item)=>sum+item.unit_price*item.quantity,0).toLocaleString()}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Low Stock</CardTitle><Package className="h-4 w-4 text-yellow-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="low_stock").length}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Out of Stock</CardTitle><Package className="h-4 w-4 text-red-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{inventory.filter(i=>i.status==="out_of_stock").length}</div></CardContent></Card>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
+        {[
+          {
+            title: "Total Items",
+            icon: <Package className="h-4 w-4 text-muted-foreground" />,
+            value: inventory.length,
+          },
+          {
+            title: "Total Value",
+            icon: <BarChart3 className="h-4 w-4 text-green-600" />,
+            value: `$${inventory
+              .reduce((sum, item) => sum + item.unit_price * item.quantity, 0)
+              .toLocaleString()}`,
+          },
+          {
+            title: "Low Stock",
+            icon: <Package className="h-4 w-4 text-yellow-600" />,
+            value: inventory.filter((i) => i.status === "low_stock").length,
+          },
+          {
+            title: "Out of Stock",
+            icon: <Package className="h-4 w-4 text-red-600" />,
+            value: inventory.filter((i) => i.status === "out_of_stock").length,
+          },
+        ].map((card, idx) => (
+          <Card key={idx} className="px-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+              {card.icon}
+            </CardHeader>
+            <CardContent className="pt-0 pb-1">
+              <div className="text-2xl font-bold">{card.value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       
