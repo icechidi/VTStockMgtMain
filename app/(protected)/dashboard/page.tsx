@@ -12,16 +12,6 @@ import { QuickActions } from "@/components/quick-actions";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MovementStats } from "@/components/movement-stats";
 
-/**
- * Protected server component.
- * This file preserves the original layout, order, spacing and padding from
- * the deleted client dashboard exactly as requested.
- *
- * Important:
- * - Do NOT add "use client" at the top — this is a server component.
- * - Client-only child components (SidebarTrigger, QuickActions, etc.) should themselves
- *   include "use client" inside their files as needed.
- */
 
 export default async function DashboardPage() {
   // server-side session guard
