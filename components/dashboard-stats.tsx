@@ -7,7 +7,7 @@ import { Package, AlertTriangle, TrendingUp, TrendingDown, BadgeAlert } from "lu
 
 interface StockStats {
   totalItems: number
-  // repairItems?: number
+  repairItems?: number
   lowStockItems: number
   totalValue: number
   recentMovements: number
@@ -16,7 +16,7 @@ interface StockStats {
 export function DashboardStats() {
   const [stats, setStats] = useState<StockStats>({
     totalItems: 0,
-    // repairItems: 0,
+    repairItems: 0,
     lowStockItems: 0,
     totalValue: 0,
     recentMovements: 0,
@@ -39,7 +39,7 @@ export function DashboardStats() {
       // Fallback to sample data
       setStats({
         totalItems: 1250,
-        // repairItems: 0,
+        repairItems: 0,
         lowStockItems: 45,
         totalValue: 125000,
         recentMovements: 23,
@@ -57,13 +57,13 @@ export function DashboardStats() {
       color: "text-blue-600",
       bgColor: "bg-blue-50",
     },
-    // {
-    //   title: "Repair Items",
-    //   value: stats.repairItems,
-    //   icon: BadgeAlert,
-    //   color: "text-blue-600",
-    //   bgColor: "bg-blue-50",
-    // },
+    {
+      title: "Repair Items",
+      value: stats.repairItems,
+      icon: BadgeAlert,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
     {
       title: "Low Stock Items",
       value: stats.lowStockItems,
@@ -106,12 +106,12 @@ export function DashboardStats() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
       {statCards.map((card, index) => {
         const Icon = card.icon
         const cardInner = (
           <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
               <div className={`p-2 rounded-full ${card.bgColor}`}>
                 <Icon className={`h-4 w-4 ${card.color}`} />
