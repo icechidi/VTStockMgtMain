@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, Plus, Search, MapPin, Tag, BarChart3, Loader2, QrCode, Scan, Filter, Eye, Edit, Trash2, DollarSign, AlertTriangle,} from "lucide-react"
+import { Package, Plus, Search, MapPin, Tag, BarChart3, Loader2, QrCode, Scan, Filter, Eye, Edit, Trash2, DollarSign, AlertTriangle, ShieldAlert, XCircle, TrendingDown, FileText, CheckCircle2, RefreshCw } from "lucide-react"
 import { AddStockItemDialogDatabase } from "@/components/add-stock-item-dialog-database"
 import { CategoryManagementDatabase } from "@/components/category-management-database"
 import { BarcodeScanner } from "@/components/barcode-scanner"
@@ -78,8 +78,8 @@ export default function InventoryPageDatabase() {
     category: "ALL",
     location: "ALL",
     stockStatus: "ALL",
-    sortBy: "created_at",
-    sortOrder: "desc", // recently added first
+    sortBy: "updated_at",
+    sortOrder: "desc", // most recently restocked / added first
   })
 
   const [filteredItems, setFilteredItems] = useState<StockItem[]>([])
@@ -119,6 +119,19 @@ export default function InventoryPageDatabase() {
 
   useEffect(() => {
     fetchData()
+  }, [])
+
+  // Auto-refresh when the user navigates back to this page (e.g. after adding a stock movement)
+  // so that items restocked via movements immediately re-sort to the top by updated_at
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchInventory()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async () => {
@@ -275,8 +288,8 @@ export default function InventoryPageDatabase() {
       const response = await fetch(`/api/stock-items?${params}`)
       if (response.ok) {
         const data: StockItem[] = await response.json()
-        // ensure sorting by created_at desc by default (recent first)
-        data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        // Sort by updated_at desc: items restocked via stock movement bubble to the top
+        data.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
         setInventory(data)
       }
     } catch (error) {
@@ -367,9 +380,9 @@ export default function InventoryPageDatabase() {
       let aValue: any = a[filters.sortBy as keyof StockItem]
       let bValue: any = b[filters.sortBy as keyof StockItem]
 
-      if (filters.sortBy === "created_at") {
-        aValue = new Date(aValue).getTime()
-        bValue = new Date(bValue).getTime()
+      if (filters.sortBy === "created_at" || filters.sortBy === "updated_at") {
+        aValue = new Date(aValue || 0).getTime()
+        bValue = new Date(bValue || 0).getTime()
       }
 
       if (typeof aValue === "string") {
@@ -392,7 +405,7 @@ export default function InventoryPageDatabase() {
       category: "ALL",
       location: "ALL",
       stockStatus: "ALL",
-      sortBy: "created_at",
+      sortBy: "updated_at",
       sortOrder: "desc",
     })
   }
@@ -589,12 +602,12 @@ export default function InventoryPageDatabase() {
           {
             title: "Low Stock",
             icon: <Package className="h-4 w-4 text-yellow-600" />,
-            value: inventory.filter((i) => i.status === "low_stock").length,
+            value: inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length,
           },
           {
             title: "Out of Stock",
             icon: <Package className="h-4 w-4 text-red-600" />,
-            value: inventory.filter((i) => i.status === "out_of_stock").length,
+            value: inventory.filter((i) => i.quantity === 0).length,
           },
         ].map((card, idx) => (
           <Card key={idx} className="px-2">
@@ -609,13 +622,36 @@ export default function InventoryPageDatabase() {
         ))}
       </div>
 
-      
-      {/* Tabs: All Items / Low Stock / Analytics */}
+      {/* Tabs: All Items / Low Stock / Out of Stock / Critical / Analytics / Report */}
       <Tabs defaultValue="all-items" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all-items">All Items</TabsTrigger>
-          <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
+          <TabsTrigger value="low-stock">
+            Low Stock
+            {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length > 0 && (
+              <span className="ml-1.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5">
+                {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="out-of-stock">
+            Out of Stock
+            {inventory.filter((i) => i.quantity === 0).length > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5">
+                {inventory.filter((i) => i.quantity === 0).length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="critical">
+            Critical
+            {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical").length > 0 && (
+              <span className="ml-1.5 rounded-full bg-orange-100 text-orange-700 text-[10px] font-bold px-1.5 py-0.5">
+                {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical").length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="report">Report</TabsTrigger>
         </TabsList>
 
         {/* All Items Tab */}
@@ -714,14 +750,16 @@ export default function InventoryPageDatabase() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="updated_at-desc">Last Updated (Newest)</SelectItem>
+                      <SelectItem value="updated_at-asc">Last Updated (Oldest)</SelectItem>
+                      <SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
+                      <SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
                       <SelectItem value="name-asc">Name (A-Z)</SelectItem>
                       <SelectItem value="name-desc">Name (Z-A)</SelectItem>
                       <SelectItem value="quantity-desc">Quantity (High-Low)</SelectItem>
                       <SelectItem value="quantity-asc">Quantity (Low-High)</SelectItem>
                       <SelectItem value="unit_price-desc">Price (High-Low)</SelectItem>
                       <SelectItem value="unit_price-asc">Price (Low-High)</SelectItem>
-                      <SelectItem value="created_at-desc">Date Added (Newest)</SelectItem>
-                      <SelectItem value="created_at-asc">Date Added (Oldest)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -898,6 +936,7 @@ export default function InventoryPageDatabase() {
                             Location
                           </div>
                         </th>
+                        <th className="text-left p-4 font-medium">Last Updated</th>
                         <th className="text-left p-4 font-medium">Actions</th>
                       </tr>
                     </thead>
@@ -927,6 +966,13 @@ export default function InventoryPageDatabase() {
                             </td>
                             <td className="p-4">
                               <span className="text-sm">{item.location_name}</span>
+                            </td>
+                            <td className="p-4">
+                              <div className="text-xs text-muted-foreground">
+                                <div title={`Added: ${item.created_at ? new Date(item.created_at).toLocaleString() : "—"}`}>
+                                  {item.updated_at ? new Date(item.updated_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                                </div>
+                              </div>
                             </td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
@@ -1028,14 +1074,15 @@ export default function InventoryPageDatabase() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
                 Low Stock Items
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {inventory
-                  .filter((item) => item.quantity <= item.min_quantity)
+                  .filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock")
+                  .sort((a, b) => a.name.localeCompare(b.name))
                   .map((item) => {
                     const status = getStockStatus(item.quantity, item.min_quantity)
                     return (
@@ -1049,23 +1096,106 @@ export default function InventoryPageDatabase() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={status.variant}>{status.label}</Badge>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              // route to restock movement if you have route (kept similar to first file)
-                              // e.g. router.push(`/movements/new?item=${item.id}`)
-                            }}
-                          >
-                            Restock
-                          </Button>
+                          <Button size="sm" onClick={() => openEditModal(item)}>Restock</Button>
                         </div>
                       </div>
                     )
                   })}
-                {inventory.filter((item) => item.quantity <= item.min_quantity).length === 0 && (
+                {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-green-500" />
                     All items are well stocked!
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Out of Stock Tab */}
+        <TabsContent value="out-of-stock">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-500" />
+                Out of Stock Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {inventory
+                  .filter((i) => i.quantity === 0)
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((item) => {
+                    const status = getStockStatus(item.quantity, item.min_quantity)
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded">
+                        <div>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Current: {item.quantity} | Min: {item.min_quantity}
+                            {item.location_name && ` | ${item.location_name}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                          <Button size="sm" onClick={() => openEditModal(item)}>Restock</Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                {inventory.filter((i) => i.quantity === 0).length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                    No items are out of stock!
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Critical Tab */}
+        <TabsContent value="critical">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-orange-500" />
+                Critical Stock Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {inventory
+                  .filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical")
+                  .sort((a, b) => {
+                    // most urgent first: lowest % of min threshold
+                    const pctA = a.min_quantity > 0 ? a.quantity / a.min_quantity : 1
+                    const pctB = b.min_quantity > 0 ? b.quantity / b.min_quantity : 1
+                    return pctA - pctB
+                  })
+                  .map((item) => {
+                    const status = getStockStatus(item.quantity, item.min_quantity)
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded">
+                        <div>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Current: {item.quantity} | Min: {item.min_quantity}
+                            {item.location_name && ` | ${item.location_name}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                          <Button size="sm" onClick={() => openEditModal(item)}>Restock</Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                {inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical").length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                    No critical stock items!
                   </div>
                 )}
               </div>
@@ -1091,12 +1221,20 @@ export default function InventoryPageDatabase() {
                     <span className="font-bold">${inventory.reduce((sum, item) => sum + item.quantity * item.unit_price, 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Low Stock Items:</span>
-                    <span className="font-bold text-orange-600">{inventory.filter((item) => item.quantity <= item.min_quantity).length}</span>
+                    <span>In Stock:</span>
+                    <span className="font-bold text-green-600">{inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "In Stock").length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Low Stock:</span>
+                    <span className="font-bold text-yellow-600">{inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Critical:</span>
+                    <span className="font-bold text-orange-600">{inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical").length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Out of Stock:</span>
-                    <span className="font-bold text-red-600">{inventory.filter((item) => item.quantity === 0).length}</span>
+                    <span className="font-bold text-red-600">{inventory.filter((i) => i.quantity === 0).length}</span>
                   </div>
                 </div>
               </CardContent>
@@ -1121,6 +1259,80 @@ export default function InventoryPageDatabase() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Report Tab */}
+        <TabsContent value="report">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Stock Report
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Summary row */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="p-4 rounded border text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Low Stock").length}</div>
+                    <div className="text-sm text-muted-foreground mt-1">Low Stock</div>
+                  </div>
+                  <div className="p-4 rounded border text-center">
+                    <div className="text-2xl font-bold text-orange-600">{inventory.filter((i) => getStockStatus(i.quantity, i.min_quantity).label === "Critical").length}</div>
+                    <div className="text-sm text-muted-foreground mt-1">Critical</div>
+                  </div>
+                  <div className="p-4 rounded border text-center">
+                    <div className="text-2xl font-bold text-red-600">{inventory.filter((i) => i.quantity === 0).length}</div>
+                    <div className="text-sm text-muted-foreground mt-1">Out of Stock</div>
+                  </div>
+                  <div className="p-4 rounded border text-center">
+                    <div className="text-2xl font-bold">${inventory.reduce((sum, i) => sum + i.quantity * i.unit_price, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div className="text-sm text-muted-foreground mt-1">Total Value</div>
+                  </div>
+                </div>
+
+                {/* All items needing action */}
+                {(() => {
+                  const actionItems = inventory
+                    .filter((i) => getStockStatus(i.quantity, i.min_quantity).label !== "In Stock")
+                    .sort((a, b) => {
+                      const order: Record<string, number> = { "Out of Stock": 0, "Critical": 1, "Low Stock": 2 }
+                      return (order[getStockStatus(a.quantity, a.min_quantity).label] ?? 3) - (order[getStockStatus(b.quantity, b.min_quantity).label] ?? 3)
+                    })
+                  if (actionItems.length === 0) return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                      All items are well stocked — no action required.
+                    </div>
+                  )
+                  return (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-muted-foreground">Items Requiring Action ({actionItems.length})</h4>
+                      {actionItems.map((item) => {
+                        const status = getStockStatus(item.quantity, item.min_quantity)
+                        return (
+                          <div key={item.id} className="flex items-center justify-between p-3 border rounded">
+                            <div>
+                              <div className="font-medium">{item.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                Current: {item.quantity} | Min: {item.min_quantity}
+                                {item.location_name && ` | ${item.location_name}`}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={status.variant}>{status.label}</Badge>
+                              <Button size="sm" onClick={() => openEditModal(item)}>Restock</Button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
