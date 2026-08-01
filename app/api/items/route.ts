@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/database"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +12,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category")
     const status = searchParams.get("status")
 
-    let whereClause = "WHERE 1=1"
+    let whereClause = "WHERE si.is_active = true"
     const params: any[] = []
     let paramCount = 0
 
@@ -65,6 +68,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const {
       name,
       description,
@@ -101,9 +109,20 @@ export async function POST(request: NextRequest) {
         category_id,
         subcategory_id,
         location_id,
-        created_by,
+        created_by ?? (session.user as { id?: string }).id,
       ],
     )
+
+    await logActivity({
+      userId: (session.user as { id?: string }).id,
+      userName: (session.user as { name?: string }).name,
+      action: "CREATE",
+      entityType: "stock_item",
+      entityId: result.rows[0].id,
+      entityName: name,
+      description: `Added stock item: ${name}`,
+      newValues: result.rows[0],
+    })
 
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error: any) {

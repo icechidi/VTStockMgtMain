@@ -3,12 +3,12 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { TopNav } from "@/components/top-nav"
-import { ThemeProvider } from "@/components/theme-provider"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { TopNav } from "@/components/layout/top-nav"
+import { ThemeProvider } from "@/components/layout/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
-import { NextAuthSessionProvider } from "@/components/session-provider"
+import { NextAuthSessionProvider } from "@/components/layout/session-provider"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 
@@ -25,14 +25,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <NextAuthSessionProvider session={session}>
             <SidebarProvider>
-              <div className="flex min-h-screen">
+              <div className="flex min-h-screen w-full">
                 <AppSidebar />
-                <div className="flex flex-1 flex-col">
+                <div className="flex min-w-0 flex-1 flex-col">
                   <TopNav />
-                  <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
+                  <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6">{children}</main>
                 </div>
               </div>
             </SidebarProvider>

@@ -1,8 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/database"
+import { rateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request)
+    const { allowed } = rateLimit(`verify-reset-code:${ip}`, 10, 15 * 60 * 1000)
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+    }
+
     const { email, code } = await request.json()
 
     if (!email || !code) {

@@ -4,7 +4,7 @@ import path from "path"
 import crypto from "crypto"
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route" // adjust path if your authOptions live elsewhere
+import { authOptions } from "@/lib/auth"
 import { query } from "@/lib/database"
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars")
@@ -38,10 +38,10 @@ function extFromMime(mime: string) {
  * or create a migration so one of these names exists.
  */
 const CANDIDATE_AVATAR_COLUMNS = [
+  "image",
   "avatar",
   "avatar_url",
   "image_url",
-  "image",
   "picture",
   "photo",
 ]

@@ -3,12 +3,6 @@ import { Pool, Client } from "pg";
 
 function ensureStringEnv(name: string): string {
   const v = process.env[name];
-  // Only log type/length, never the actual secret
-  console.log(
-    `[env check] ${name}: type=${typeof v} ${
-      v === undefined ? "(undefined)" : `(length=${String(v).length})`
-    }`
-  );
   if (v === undefined) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
@@ -24,7 +18,6 @@ let pool: Pool;
 
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
-  console.log("[db] Using DATABASE_URL");
 } else {
   const DB_USER = ensureStringEnv("DB_USER");
   const DB_HOST = ensureStringEnv("DB_HOST");
@@ -66,23 +59,30 @@ try {
   console.warn("[db] could not normalize pool.options:", err);
 }
 
-// Quick sanity check (won’t print secret)
+pool.on("error", (err) => {
+  console.error("[db] Unexpected pool error:", err.message);
+});
+
+// Quick sanity check on startup (does not print any secret)
 (async () => {
   try {
     const client = await pool.connect();
     client.release();
-    console.log("[db] Pool connection test: OK");
   } catch (err: any) {
     console.error("[db] Pool connection test: FAILED:", err?.message ?? err);
   }
 })();
 
-// Database query helper with timing + row count logging
+// Database query helper. Timing/row-count logging is dev-only so production
+// logs aren't flooded with every query (and query text/params never get
+// logged, in either mode).
 export async function query(text: string, params?: any[]) {
   const start = Date.now();
   const res = await pool.query(text, params);
-  const duration = Date.now() - start;
-  console.log("[db] Executed query", { text, duration, rows: res.rowCount });
+  if (process.env.NODE_ENV !== "production") {
+    const duration = Date.now() - start;
+    console.log(`[db] query executed in ${duration}ms, rows: ${res.rowCount}`);
+  }
   return res;
 }
 

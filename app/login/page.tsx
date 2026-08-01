@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Package, Eye, EyeOff } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { ForgotPasswordDialog } from "@/components/forgot-password-dialog"
+import { ForgotPasswordDialog } from "@/components/account/forgot-password-dialog"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -29,7 +29,6 @@ export default function LoginPage() {
   useEffect(() => {
     const checkSession = async () => {
       const session = await getSession()
-      console.log("Session on login page:", session)
       if (session?.user?.id) {
         router.replace("/dashboard")
       }
@@ -76,17 +75,6 @@ export default function LoginPage() {
     }
   }
 
-  const fillDemoCredentials = (role: "admin" | "manager" | "employee") => {
-    const credentials = {
-      admin: { email: "admin@company.com", password: "myNewSecurePassword" },
-      manager: { email: "jane@company.com", password: "" },
-      employee: { email: "mike@company.com", password: "" },
-    }
-
-    setEmail(credentials[role].email)
-    setPassword(credentials[role].password)
-  }
-
   // Handler passed to ForgotPasswordDialog (optional)
   const handleForgotPasswordSubmit = async (payload: { email: string }) => {
     // This example assumes you have an endpoint at /api/auth/forgot-password
@@ -127,20 +115,18 @@ export default function LoginPage() {
 
   return (
     // Fullscreen fixed wrapper so the card always sits in the center of the viewport
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <Card className="shadow-2xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-          <CardHeader className="text-center space-y-4 pb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <Package className="h-8 w-8 text-primary" />
+        <Card className="border shadow-2xl">
+          <CardHeader className="space-y-4 pb-6 text-center">
+            <div className="mb-2 flex items-center justify-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+                V
               </div>
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">Inventory Pro</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
-                Sign in to your account to continue
-              </CardDescription>
+              <CardTitle className="text-xl font-bold">VT-Stock MGT</CardTitle>
+              <CardDescription className="mt-1.5">Sign in to your account to continue</CardDescription>
             </div>
           </CardHeader>
 
@@ -186,9 +172,9 @@ export default function LoginPage() {
                     disabled={isLoading}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-slate-500" />
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <Eye className="h-4 w-4 text-slate-500" />
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                     )}
                   </Button>
                 </div>
@@ -222,43 +208,6 @@ export default function LoginPage() {
               >
                 Forgot your password?
               </Button>
-            </div>
-
-            {/* Demo Credentials */}
-            <div className="border-t pt-6">
-              <p className="text-sm font-medium text-center text-slate-700 dark:text-slate-300 mb-4">Demo Accounts</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillDemoCredentials("admin")}
-                  disabled={isLoading}
-                  className="text-xs"
-                >
-                  Admin
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillDemoCredentials("manager")}
-                  disabled={isLoading}
-                  className="text-xs"
-                >
-                  Manager
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillDemoCredentials("employee")}
-                  disabled={isLoading}
-                  className="text-xs"
-                >
-                  Employee
-                </Button>
-              </div>
-              <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-3">
-                Click any role above to auto-fill credentials
-              </p>
             </div>
           </CardContent>
         </Card>

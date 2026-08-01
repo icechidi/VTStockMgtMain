@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { query, getClient } from "@/lib/database";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { logActivity } from "@/lib/activity-log";
 
 export async function GET() {
   try {
@@ -38,6 +41,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const client = await getClient();
+  const session = await getServerSession(authOptions);
 
   try {
     await client.query("BEGIN");
@@ -51,11 +55,16 @@ export async function POST(request: NextRequest) {
       notes,
       reference_number,
       location,
+      location_id: bodyLocationId,
       supplier,
+      supplier_id: bodySupplierId,
       customer,
+      customer_id: bodyCustomerId,
       movement_date,
-      created_by = null, // Default to null if not provided
+      created_by,
     } = body;
+
+    const actorId = created_by ?? (session?.user as { id?: string } | undefined)?.id ?? null;
 
     if (!item_id || !movement_type || !quantity) {
       throw new Error("item_id, movement_type, and quantity are required");
@@ -79,22 +88,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Resolve UUIDs for location, supplier, customer
-    let location_id: string | null = null;
-    let supplier_id: string | null = null;
-    let customer_id: string | null = null;
+    // Resolve UUIDs for location, supplier, customer. Prefer an ID passed
+    // directly (this is what AddMovementDialog actually sends, since it
+    // already has a proper Select bound to real records) and only fall back
+    // to a name-based lookup for callers that only have a free-text name --
+    // previously this route only supported the name lookup, which silently
+    // dropped supplier_id whenever a caller sent it instead, meaning
+    // movements were created with no supplier attached even when one was
+    // selected in the UI.
+    let location_id: string | null = bodyLocationId ?? null;
+    let supplier_id: string | null = bodySupplierId ?? null;
+    let customer_id: string | null = bodyCustomerId ?? null;
 
-    if (location) {
+    if (!location_id && location) {
       const res = await client.query("SELECT id FROM locations WHERE name = $1", [location]);
       location_id = res.rows[0]?.id ?? null;
     }
 
-    if (supplier) {
+    if (!supplier_id && supplier) {
       const res = await client.query("SELECT id FROM suppliers WHERE name = $1", [supplier]);
       supplier_id = res.rows[0]?.id ?? null;
     }
 
-    if (customer) {
+    if (!customer_id && customer) {
       const res = await client.query("SELECT id FROM customers WHERE name = $1", [customer]);
       customer_id = res.rows[0]?.id ?? null;
     }
@@ -124,7 +140,7 @@ export async function POST(request: NextRequest) {
         supplier_id,
         customer_id,
         movement_date ?? new Date(),
-        created_by,
+        actorId,
       ]
     );
 
@@ -172,6 +188,17 @@ export async function POST(request: NextRequest) {
       `,
       [movementInsert.rows[0].id]
     );
+
+    await logActivity({
+      userId: actorId,
+      userName: (session?.user as { name?: string } | undefined)?.name,
+      action: "CREATE",
+      entityType: "movement",
+      entityId: movementInsert.rows[0].id,
+      entityName: movementResult.rows[0]?.item_name,
+      description: `Recorded ${movement_type} movement of ${quantity} for ${movementResult.rows[0]?.item_name ?? "item"}`,
+      newValues: movementResult.rows[0],
+    });
 
     return NextResponse.json(movementResult.rows[0], { status: 201 });
   } catch (error) {

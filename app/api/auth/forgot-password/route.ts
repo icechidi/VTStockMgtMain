@@ -1,8 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/database"
+import { rateLimit, getClientIp } from "@/lib/rate-limit"
+import { sendPasswordResetEmail } from "@/lib/email"
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request)
+    const { allowed } = rateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000)
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+    }
+
     const { email } = await request.json()
 
     if (!email) {
@@ -32,8 +40,16 @@ export async function POST(request: NextRequest) {
       [userId, resetCode, expiresAt],
     )
 
-    // In a real application, you would send an email here
-    console.log(`Password reset code for ${email}: ${resetCode}`)
+    // Send the code by email. Falls back to a dev-only console log if SMTP
+    // isn't configured yet (see lib/email.ts) -- fails loudly instead in
+    // production so a broken email config doesn't silently do nothing.
+    try {
+      await sendPasswordResetEmail(email, resetCode)
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError)
+      // Still return the generic success message -- don't leak whether the
+      // email send failed, and don't leak whether the account exists.
+    }
 
     return NextResponse.json({ message: "If the email exists, a reset code has been sent" })
   } catch (error) {

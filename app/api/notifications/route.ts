@@ -1,67 +1,113 @@
 // app/api/notifications/route.ts
-import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
-import { query } from "@/lib/database" // your existing helper that returns { rows, ... }
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { query } from "@/lib/database"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-type NotificationRow = {
+export interface NotificationItem {
   id: string
   title: string
   message: string
-  type: string
-  created_at: string | Date
-  read_at: string | null
-  user_id?: string | null
-  meta?: any
+  type: "info" | "success" | "warning" | "error"
+  timestamp: string
+  link?: string
 }
 
-export async function GET(request: NextRequest) {
+// Real notifications derived from live data -- no separate notifications
+// table to keep in sync, no fake/placeholder content. Combines:
+//   1) Urgent stock alerts (out of stock / critical) computed live
+//   2) Recent meaningful activity log entries (last 48h)
+export async function GET() {
   try {
-    // token: Authorization header "Bearer ..." or cookie "auth_token"
-    const token =
-      request.headers.get("authorization")?.replace("Bearer ", "") ||
-      request.cookies.get("auth_token")?.value
-
-    if (!token) return NextResponse.json({ error: "No token provided" }, { status: 401 })
-
-    let decoded: any
-    try {
-      decoded = jwt.verify(token, JWT_SECRET) as any
-    } catch (err) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const userId = decoded.userId ?? decoded.id ?? null
+    const notifications: NotificationItem[] = []
 
-    // Query notifications intended for this user OR global (user_id IS NULL)
-    const sql = `
-      SELECT id, title, message, type, created_at, read_at, user_id, meta
-      FROM notifications
-      WHERE (user_id = $1 OR user_id IS NULL)
-      ORDER BY created_at DESC
-      LIMIT 50
-    `
-    const result = await query(sql, [userId])
+    try {
+      const alertRows = await query(
+        `SELECT id, name, quantity, min_quantity
+         FROM stock_items
+         WHERE is_active = true AND min_quantity IS NOT NULL AND quantity <= min_quantity * 0.5
+         ORDER BY quantity ASC
+         LIMIT 5`,
+      )
+      for (const r of alertRows.rows) {
+        const outOfStock = Number(r.quantity) <= 0
+        notifications.push({
+          id: `alert-${r.id}`,
+          title: outOfStock ? "Out of Stock" : "Critical Stock Level",
+          message: outOfStock
+            ? `${r.name} is out of stock.`
+            : `${r.name}: only ${r.quantity} left (min ${r.min_quantity}).`,
+          type: outOfStock ? "error" : "warning",
+          timestamp: new Date().toISOString(),
+          link: `/stocks?search=${encodeURIComponent(r.name)}`,
+        })
+      }
+    } catch (err) {
+      console.error("[notifications] alert query failed:", err)
+    }
 
-    const rows = (result.rows ?? []) as NotificationRow[]
+    try {
+      const activityRows = await query(
+        `SELECT id, user_name, action, entity_type, entity_name, description, created_at
+         FROM activity_logs
+         WHERE created_at >= NOW() - INTERVAL '48 hours'
+           AND action NOT IN ('LOGIN_FAILED')
+         ORDER BY created_at DESC
+         LIMIT 10`,
+      )
+      for (const r of activityRows.rows) {
+        notifications.push({
+          id: `activity-${r.id}`,
+          title: activityTitle(r.action, r.entity_type),
+          message: r.description ?? `${r.action} on ${r.entity_type}`,
+          type: activityType(r.action),
+          timestamp: new Date(r.created_at).toISOString(),
+          link: "/activity-logs",
+        })
+      }
+    } catch (err) {
+      console.error("[notifications] activity query failed:", err)
+    }
 
-    const notifications = rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      message: r.message,
-      type: r.type,
-      timestamp: new Date(r.created_at).toISOString(),
-      read: r.read_at !== null,
-      meta: r.meta ?? null,
-    }))
+    notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-    return NextResponse.json({ notifications })
+    return NextResponse.json({ notifications: notifications.slice(0, 20) })
   } catch (error) {
-    console.error("Notifications fetch error:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch notifications", details: (error as any)?.message ?? String(error) },
-      { status: 500 },
-    )
+    console.error("Database error (/api/notifications):", error)
+    return NextResponse.json({ error: "Failed to fetch notifications", notifications: [] }, { status: 500 })
   }
+}
+
+function activityTitle(action: string, entityType: string): string {
+  const entity = (entityType ?? "item").replace(/_/g, " ")
+  const cap = entity.charAt(0).toUpperCase() + entity.slice(1)
+  switch (action) {
+    case "CREATE":
+      return `New ${entity} added`
+    case "UPDATE":
+      return `${cap} updated`
+    case "DELETE":
+      return `${cap} removed`
+    case "LOGIN":
+      return "User signed in"
+    case "LOGOUT":
+      return "User signed out"
+    case "PASSWORD_CHANGE":
+      return "Password changed"
+    case "PASSWORD_RESET":
+      return "Password reset"
+    default:
+      return action
+  }
+}
+
+function activityType(action: string): NotificationItem["type"] {
+  if (action === "DELETE") return "warning"
+  if (action === "CREATE") return "success"
+  return "info"
 }

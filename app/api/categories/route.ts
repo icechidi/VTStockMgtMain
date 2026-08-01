@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/database"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 export async function GET() {
   try {
@@ -47,6 +50,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { name, description } = await request.json()
 
     if (!name) {
@@ -57,6 +65,17 @@ export async function POST(request: NextRequest) {
       name,
       description,
     ])
+
+    await logActivity({
+      userId: (session.user as { id?: string }).id,
+      userName: (session.user as { name?: string }).name,
+      action: "CREATE",
+      entityType: "category",
+      entityId: result.rows[0].id,
+      entityName: name,
+      description: `Created category: ${name}`,
+      newValues: result.rows[0],
+    })
 
     return NextResponse.json(result.rows[0], { status: 201 })
   } catch (error: any) {

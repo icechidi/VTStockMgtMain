@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/database"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
+import { getServerSession } from "next-auth/next"
+import { authOptions } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 // Fetch all users
 export async function GET() {
@@ -18,6 +21,7 @@ export async function GET() {
         COALESCE(l.name, '') AS location_name,
         COALESCE(l.code, '') AS location_code,
         u.join_date,
+        u.last_login,
         u.created_at,
         u.updated_at
       FROM users u
@@ -36,6 +40,11 @@ export async function GET() {
 // Create a new user with one-time password
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const {
       name,
       email,
@@ -73,6 +82,18 @@ export async function POST(request: NextRequest) {
     )
 
     const newUser = result.rows[0]
+
+    await logActivity({
+      userId: (session.user as { id?: string }).id,
+      userName: (session.user as { name?: string }).name,
+      action: "CREATE",
+      entityType: "user",
+      entityId: newUser.id,
+      entityName: name,
+      description: `Created user account: ${name} (${email})`,
+      // Deliberately not including the OTP/password hash in the log.
+      newValues: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
+    })
 
     // 4. Return new user (minus sensitive hash) + OTP for admin
    

@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/change-password",
   "/api/health",
   "/api/health/database",
+  "/api/auth", // NextAuth's own routes: signin, callback, session, csrf, providers, signout
   "/favicon.ico",
   "/robots.txt",
   "/sitemap.xml",
@@ -22,6 +23,9 @@ const PROTECTED_PREFIXES = [
   "/locations",
   "/reports",
   "/alerts",
+  "/repairs",
+  "/suppliers",
+  "/activity-logs",
 ];
 
 function isPublic(pathname: string) {
@@ -49,9 +53,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // For protected prefixes, require NextAuth token/session
-  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  if (needsAuth) {
+  // For protected page prefixes, require NextAuth token/session
+  const needsPageAuth = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  if (needsPageAuth) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
       const loginUrl = new URL("/login", req.url);
@@ -67,6 +71,20 @@ export async function middleware(req: NextRequest) {
     }
 
     // token exists and not required to change password -> allow
+    return NextResponse.next();
+  }
+
+  // Every other /api/* route (not explicitly public above) requires a valid
+  // session too -- previously most data routes (items, categories,
+  // locations, users, movements, dashboard stats, etc.) had no auth check
+  // at all, either at the route level or here, meaning they were reachable
+  // by anyone without logging in. Returns JSON (not a redirect) since these
+  // are fetch() targets, not page navigations.
+  if (pathname.startsWith("/api/")) {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.next();
   }
 
@@ -87,6 +105,9 @@ export const config = {
     "/locations/:path*",
     "/reports/:path*",
     "/alerts/:path*",
-    "/api/health/:path*",
+    "/repairs/:path*",
+    "/suppliers/:path*",
+    "/activity-logs/:path*",
+    "/api/:path*",
   ],
 };
